@@ -1,0 +1,31 @@
+<div class="project-container m-3" *ngIf="isLoad; else loadEle">
+  <!-- title start -->
+  <div class="mb-3">
+    <h3>Dashboard</h3>
+  </div>
+  <!-- title end -->
+  
+  <!-- project list start -->
+  <div class="project-list-container">
+    <ul class="list-group">
+      <li
+        class="list-group-item d-flex justify-content-between align-items-center pointer"
+        *ngFor="let project of projects; let ind = index"
+        (click)="goToTaskPage(project)"
+      >
+        <!-- project name start -->
+        <div>{{ project?.name }}</div>
+        <!-- project name end -->
+      </li>
+    </ul>
+  </div>
+  <!-- project list end -->
+</div>
+
+<!-- load start -->
+<ng-template #loadEle>
+  <div class="d-flex justify-content-center align-items-center loading-container">
+    <i class="fa fa-spinner fa-pulse fa-3x fa-fw"></i>
+  </div>
+</ng-template>
+<!-- load end -->

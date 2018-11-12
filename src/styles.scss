@@ -1,0 +1,18 @@
+@import '~bootstrap/scss/bootstrap-reboot';
+@import '~bootstrap/scss/bootstrap-grid';
+
+html, body {
+    height: 100%;
+}
+
+a {
+    cursor: pointer;
+}
+
+.pointer {
+    cursor: pointer;
+}
+
+.loading-container {
+    height: calc(100% - 56px);
+}
