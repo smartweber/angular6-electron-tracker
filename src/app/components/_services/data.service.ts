@@ -1,11 +1,12 @@
 import { Injectable } from '@angular/core';
-import { ElectronService } from 'ngx-electron';
 import { HttpService } from './http.service';
 import { Subject, Observable } from 'rxjs';
+import { ElectronService } from '../../providers/electron.service';
 
 @Injectable()
 export class DataService {
   isTakingScreenShot: boolean; // taking screenshot flag
+  isTracking: boolean;
   windowWidth: number; // window width
   windowHeight: number; // window height
   tasks: Object[]; // tasks
@@ -33,13 +34,14 @@ export class DataService {
     this.currentProject = {};
     this.tasksSubject = new Subject();
     this.isTakingScreenShot = false;
+    this.isTracking = false;
   }
 
   /**
    * set listeners
    */
   setAcitivityListener() {
-    if (this._electronService.isElectronApp) {
+    if (this._electronService.isElectron) {
       /**
        * tray icon control
        */
@@ -115,6 +117,7 @@ export class DataService {
         this.currentTaskId = arg['currentTaskId'];
         this.selectedProjectId = arg['selectedProjectId'];
         this.selectedTaskId = arg['selectedTaskId'];
+        this.isTracking = true;
 
         if (this.tasks.length > 0) {
           for (let index = 0; index < this.tasks.length; index ++) {
@@ -135,6 +138,7 @@ export class DataService {
         this.currentTaskId = -1;
         this.selectedProjectId = -1;
         this.selectedTaskId = -1;
+        this.isTracking = false;
         if (this.tasks.length > 0) {
           for (let index = 0; index < this.tasks.length; index ++) {
             if (this.tasks[index]['id'] === arg['task_id']) {
@@ -155,7 +159,8 @@ export class DataService {
    * stop track
    */
   stopTrack() {
-    if (this._electronService.isElectronApp) {
+    if (this._electronService.isElectron) {
+      this.isTracking = false;
       this._electronService.ipcRenderer.send('stop-track', {
         taskId: this.currentTaskId,
         projectId: this.currentProjectId

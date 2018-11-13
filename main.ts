@@ -105,7 +105,7 @@ function createWindow() {
   tray.setToolTip('Time Tracker');
   tray.setContextMenu(contextMenu);
 
-  // win.webContents.openDevTools();
+  win.webContents.openDevTools();
 
   // Emitted when the window is closed.
   win.on('closed', () => {
@@ -294,9 +294,8 @@ try {
       tray.destroy();
       tray = null;
     }
-    setTimeout(() => {
-      ioHook.stop();
-    }, 100);
+    ioHook.stop();
+    ioHook.unload();
     destroyListners();
   });
 
@@ -362,6 +361,14 @@ try {
         tray.setContextMenu(contextMenu);
       }
     }
+  });
+
+  /**
+   * ipcMain lisner to quit the app
+   */
+  ipcMain.on('quit-app', (event, arg) => {
+    win = null;
+    app.quit();
   });
 
   /**

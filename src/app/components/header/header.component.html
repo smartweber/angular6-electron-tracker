@@ -1,20 +1,41 @@
-<nav class="navbar navbar-dark bg-dark">
+<mat-toolbar color="primary">
   <!-- Logo Content start -->
-  <a class="navbar-brand" [routerLink]="['/dashboard']">TimeTracker</a>
+  <a class="navbar-brand" [routerLink]="['/dashboard']">
+    <img src="favicon.png" />
+  </a>
   <!-- Logo Content end -->
-  <!-- <div class="navbar-expand mr-auto" *ngIf="isLogin">
-    <div class="navbar-nav">
-      <a class="nav-item nav-link" [ngClass]="{'active': path === '/'}" [routerLink]="['/']">Home</a>
-    </div>
-  </div> -->
 
-  <!-- Logout start -->
-  <div class="navbar-expand ml-auto navbar-nav">
-    <div class="navbar-nav">
-      <a class="nav-item nav-link" (click)="logout()" *ngIf="isLogin">
-        Logout
-      </a>
-    </div>
+  <div>
+    UI 12:20
   </div>
-  <!-- Logout end -->
-</nav>
+
+  <!-- Menu start -->
+  <button mat-button [matMenuTriggerFor]="main_menu">My menu</button>
+  <mat-menu #main_menu="matMenu">
+    <button mat-menu-item>Engagement</button>
+    <button mat-menu-item>Timer is running</button>
+    <button mat-menu-item [matMenuTriggerFor]="switch_projects">Switch Projects</button>
+    <button mat-menu-item (click)="addNote()">Add a note</button>
+    <a class="none-underline" mat-menu-item [routerLink]="['/dashboard']">Open Dashboard</a>
+    <a class="none-underline" mat-menu-item [routerLink]="['/setting']">Settings</a>
+    <a class="none-underline" mat-menu-item [routerLink]="['/about']">About Track.ly</a>
+    <a class="none-underline" mat-menu-item [routerLink]="['/help']">Help</a>
+    <a class="none-underline" mat-menu-item [routerLink]="['/check']">Check for updates</a>
+    <button mat-menu-item (click)="logout()">Singout</button>
+    <button mat-menu-item (click)="quit()">Quit tracker</button>
+  </mat-menu>
+
+  <mat-menu #switch_projects="matMenu">
+    <ng-container *ngFor="let mainItem of my_menu | objectKey">
+      <button mat-menu-item [matMenuTriggerFor]="sub_menu">{{ mainItem }}</button>
+      <mat-menu #sub_menu="matMenu">
+        <button *ngFor="let subItem of my_menu[mainItem]" mat-menu-item>{{ subItem }}</button>
+      </mat-menu>
+    </ng-container>
+  </mat-menu>
+  <!-- Menu end -->
+
+  <!-- This fills the remaining space of the current row -->
+  <!-- <span class="fill-remaining-space"></span> -->
+  
+</mat-toolbar>

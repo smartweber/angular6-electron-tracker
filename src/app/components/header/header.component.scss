@@ -1,0 +1,13 @@
+:host {
+  .navbar-brand {
+    height: 100%;
+
+    img {
+      height: 100%;
+    }
+  }
+
+  .fill-remaining-space {
+    flex: 1 1 auto;
+  }
+}
