@@ -1,12 +1,16 @@
 <div class="alert-modal-container">
-  <h1 mat-dialog-title class="primary-color">{{ title }}</h1>
+  <h1 mat-dialog-title class="primary-color" class="text-center">{{ title }}</h1>
 
-  <mat-dialog-content class="accent-color">
-    note
+  <mat-dialog-content>
+    <div class="note-text-container">
+      <textarea class="full-width" [(ngModel)]="note" rows="4"></textarea>
+    </div>
   </mat-dialog-content>
 
   <mat-dialog-actions>
-    <button mat-stroked-button mat-dialog-close color="warn" (click)="cancel()">Cancel</button>
-    <button mat-stroked-button mat-dialog-close color="primary" (click)="cancel()">Add Note</button>
+    <div class="note-action-container">
+      <button mat-stroked-button mat-dialog-close color="warn" (click)="cancel()">Cancel</button>
+      <button mat-stroked-button mat-dialog-close color="primary" (click)="addNote()">Add Note</button>
+    </div>
   </mat-dialog-actions>
   </div>

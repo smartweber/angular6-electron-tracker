@@ -18,6 +18,7 @@ export class DataService {
   selectedProjectId: number; // selected project id
 
   private tasksSubject: Subject<any>; // tasks subscription
+  private trackingSubject: Subject<any>; // tasks subscription
 
   constructor(
     private _electronService: ElectronService,
@@ -33,6 +34,7 @@ export class DataService {
     this.selectedProjectId = -1;
     this.currentProject = {};
     this.tasksSubject = new Subject();
+    this.trackingSubject = new Subject();
     this.isTakingScreenShot = false;
     this.isTracking = false;
   }
@@ -118,6 +120,9 @@ export class DataService {
         this.selectedProjectId = arg['selectedProjectId'];
         this.selectedTaskId = arg['selectedTaskId'];
         this.isTracking = true;
+        this.trackingSubject.next({
+          isTracking: this.isTracking
+        });
 
         if (this.tasks.length > 0) {
           for (let index = 0; index < this.tasks.length; index ++) {
@@ -139,6 +144,10 @@ export class DataService {
         this.selectedProjectId = -1;
         this.selectedTaskId = -1;
         this.isTracking = false;
+        this.trackingSubject.next({
+          isTracking: this.isTracking
+        });
+
         if (this.tasks.length > 0) {
           for (let index = 0; index < this.tasks.length; index ++) {
             if (this.tasks[index]['id'] === arg['task_id']) {
@@ -161,6 +170,10 @@ export class DataService {
   stopTrack() {
     if (this._electronService.isElectron) {
       this.isTracking = false;
+      this.trackingSubject.next({
+        isTracking: this.isTracking
+      });
+
       this._electronService.ipcRenderer.send('stop-track', {
         taskId: this.currentTaskId,
         projectId: this.currentProjectId
@@ -200,6 +213,13 @@ export class DataService {
    */
   getTasksSubscribe(): Observable<any> {
     return this.tasksSubject.asObservable();
+  }
+
+  /**
+   * raise tracking subscribe
+   */
+  getTrackingSubscribe(): Observable<any> {
+    return this.trackingSubject.asObservable();
   }
 
   /**

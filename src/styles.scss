@@ -29,3 +29,65 @@ button:focus {
 .none-underline {
     text-decoration: none !important;
 }
+
+.mat-menu-item {
+    &.engagement-container {
+        height: auto;
+    
+        .engagement-wrapper {
+            div {
+                line-height: initial;
+            }
+
+            .percentage-wrapper {
+                display: flex;
+                flex-flow: row;
+                align-items: center;
+
+                .average {
+                    flex: 1 0 auto;
+                    text-align: center;
+                }
+
+                .tick {
+                    flex: 0 0 3em;
+
+                    .mat-icon {
+                        margin: 0;
+                    }
+                }
+            }
+        }
+    }
+
+    .timer-wrapper {
+        display: flex;
+        flex-flow: row;
+        align-items: center;
+        justify-content: space-between;
+
+        .status {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+
+            &.stop {
+                background-color: gold;
+            }
+
+            &.active {
+                background-color: green;
+            }
+        }
+
+        .title {
+            margin: 0 10px 0 2px;
+        }
+
+        .timer-icon {
+            .mat-icon {
+                margin: 0;
+            }
+        }
+    }
+}

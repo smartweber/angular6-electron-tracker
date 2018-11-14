@@ -14,7 +14,9 @@ import { NoteComponent } from '../modals/note/note.component';
 })
 export class HeaderComponent implements OnInit, OnDestroy {
   isLogin: boolean; // user login flag
+  isRunTimer: boolean;
   sub: Subscription; // router navigation subscription
+  trackingSub: Subscription; // tracking subscription
   my_menu = {
     'main1': ['sub1', 'sub2'],
     'main2': ['sub1', 'sub2'],
@@ -26,6 +28,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
     private _dataService: DataService,
     private _electronService: ElectronService
   ) {
+    this.isRunTimer = false;
   }
 
   ngOnInit() {
@@ -35,12 +38,24 @@ export class HeaderComponent implements OnInit, OnDestroy {
         this.initData();
       }
     });
+
+    /**
+     * tracking subscription listener
+     */
+    this.trackingSub = this._dataService.getTrackingSubscribe().subscribe(res => {
+      console.log('--tracking:', res);
+      this.isRunTimer = res['isTracking'];
+    });
   }
 
   ngOnDestroy() {
     // destroy subscriptions
     if (this.sub) {
       this.sub.unsubscribe();
+    }
+
+    if (this.trackingSub) {
+      this.trackingSub.unsubscribe();
     }
   }
 

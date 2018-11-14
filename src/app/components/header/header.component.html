@@ -1,19 +1,74 @@
 <mat-toolbar color="primary">
-  <!-- Logo Content start -->
-  <a class="navbar-brand" [routerLink]="['/dashboard']">
+  <!-- Project detail start -->
+  <a class="detail-container" [matMenuTriggerFor]="main_menu">
+    <!-- Logo Content start -->
     <img src="favicon.png" />
-  </a>
-  <!-- Logo Content end -->
+    <!-- Logo Content end -->
 
-  <div>
-    UI 12:20
-  </div>
+    <!-- Project information start -->
+    <div>
+      UI 12:20
+    </div>
+    <!-- Project information end -->
+  </a>
+  <!-- Project detail end -->
 
   <!-- Menu start -->
-  <button mat-button [matMenuTriggerFor]="main_menu">My menu</button>
   <mat-menu #main_menu="matMenu">
-    <button mat-menu-item>Engagement</button>
-    <button mat-menu-item>Timer is running</button>
+    <!-- Engagement start-->
+    <button class="engagement-container" mat-menu-item>
+      <div class="engagement-wrapper p-2">
+        <!-- Engagement title start-->
+        <div class="title">Engagement</div>
+        <!-- Engagement title end-->
+
+        <!-- Engagement percentage start-->
+        <div class="percentage-wrapper">
+          <div class="average">34%</div>
+          <div class="tick">
+            <mat-icon>arrow_drop_up</mat-icon>
+            2%
+          </div>
+        </div>
+        <!-- Engagement percentage start-->
+
+        <!-- During start-->
+        <div class="during-wrapper">
+          (09:00AM - 10:00AM)
+        </div>
+        <!-- During end-->
+      </div>
+    </button>
+    <!-- Engagement end-->
+
+    <!-- Timer start -->
+    <button class="timer-container" mat-menu-item>
+      <div class="timer-wrapper">
+        <!-- Timer status start -->
+        <div
+          class="status"
+          [ngClass]="{'active': isRunTimer, 'stop': !isRunTimer}"
+        ></div>
+        <!-- Timer status end -->
+
+        <!-- Timer title start -->
+        <div class="title">
+          {{ !isRunTimer ? 'Timer is paused' : 'Timer is running' }}
+        </div>
+        <!-- Timer title end -->
+
+        <!-- Timer icon start -->
+        <div class="timer-icon">
+          <mat-icon *ngIf="isRunTimer;else playTimerIconEle">pause_circle_outline</mat-icon>
+          <ng-template #playTimerIconEle>
+            <mat-icon>play_circle_outline</mat-icon>
+          </ng-template>
+        </div>
+        <!-- Timer icon end -->
+      </div>
+    </button>
+    <!-- Timer end -->
+
     <button mat-menu-item [matMenuTriggerFor]="switch_projects">Switch Projects</button>
     <button mat-menu-item (click)="addNote()">Add a note</button>
     <a class="none-underline" mat-menu-item [routerLink]="['/dashboard']">Open Dashboard</a>
@@ -34,8 +89,4 @@
     </ng-container>
   </mat-menu>
   <!-- Menu end -->
-
-  <!-- This fills the remaining space of the current row -->
-  <!-- <span class="fill-remaining-space"></span> -->
-  
 </mat-toolbar>

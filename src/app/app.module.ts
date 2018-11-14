@@ -36,7 +36,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatDialogModule } from '@angular/material/dialog';
-
+import { MatIconModule } from '@angular/material/icon';
+import { MatRadioModule } from '@angular/material/radio';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatSelectModule } from '@angular/material/select';
+import { NgxMaterialTimepickerModule } from 'ngx-material-timepicker';
 
 import { ObjectKeyPipe } from './components/_pipes/object-key.pipe';
 import { AboutComponent } from './components/about/about.component';
@@ -88,7 +92,12 @@ export function HttpLoaderFactory(http: HttpClient) {
     MatFormFieldModule,
     MatInputModule,
     MatToolbarModule,
-    MatDialogModule
+    MatDialogModule,
+    MatIconModule,
+    MatRadioModule,
+    MatCheckboxModule,
+    MatSelectModule,
+    NgxMaterialTimepickerModule.forRoot()
   ],
   providers: [
     ElectronService,

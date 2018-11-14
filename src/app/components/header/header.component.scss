@@ -1,9 +1,15 @@
 :host {
-  .navbar-brand {
+
+  .detail-container {
     height: 100%;
+    display: flex;
+    flex-flow: row;
+    justify-content: space-between;
+    align-items: center;
 
     img {
       height: 100%;
+      margin-right: 10px;
     }
   }
 

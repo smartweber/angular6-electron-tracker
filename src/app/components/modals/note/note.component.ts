@@ -15,6 +15,7 @@ import {
 })
 export class NoteComponent implements OnInit {
   title: string;
+  note: string;
 
   constructor(public dialgoRef: MatDialogRef<NoteComponent>, @Inject(MAT_DIALOG_DATA) public data: any) {
     this.title = 'Add Work Notes';
@@ -25,6 +26,10 @@ export class NoteComponent implements OnInit {
 
   cancel() {
     this.dialgoRef.close(false);
+  }
+
+  addNote() {
+    console.log(this.note);
   }
 
 }
