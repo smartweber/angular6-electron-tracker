@@ -9,6 +9,7 @@ export class DataService {
   isTracking: boolean;
   windowWidth: number; // window width
   windowHeight: number; // window height
+  activityId: number; // activity id
   tasks: Object[]; // tasks
   screenshotUrls: Object[]; // screenshot urls for one activity
   currentProject: Object; // current project detail
@@ -17,8 +18,11 @@ export class DataService {
   selectedTaskId: number; // selected task id
   selectedProjectId: number; // selected project id
 
+  private projectsSubject: Subject<any>; // projects subscription
   private tasksSubject: Subject<any>; // tasks subscription
   private trackingSubject: Subject<any>; // tasks subscription
+  private selectProjectSubject: Subject<any>; // selected project subject
+  private activitySubject: Subject<any>; // selected project subject
 
   constructor(
     private _electronService: ElectronService,
@@ -32,9 +36,13 @@ export class DataService {
     this.currentTaskId = -1;
     this.selectedTaskId = -1;
     this.selectedProjectId = -1;
+    this.activityId = -1;
     this.currentProject = {};
+    this.projectsSubject = new Subject();
     this.tasksSubject = new Subject();
     this.trackingSubject = new Subject();
+    this.selectProjectSubject = new Subject();
+    this.activitySubject = new Subject();
     this.isTakingScreenShot = false;
     this.isTracking = false;
   }
@@ -188,7 +196,7 @@ export class DataService {
   setTasks(projectId: number) {
     this.tasks = [];
     this._httpService.getCall(
-      `/trackly/gets/tasks?target_table=projects&table_join_column=project_id&target_table_join_column=id&where=project_id=${projectId}`
+      `/trackly/gets/tasks?table_join_column=project_id&target_table1_join_column=id&where=tasks.project_id=${projectId}`
     ).then((res) => {
       console.log(res);
       if (res.data && res.data.length > 0) {
@@ -209,6 +217,68 @@ export class DataService {
   }
 
   /**
+   * get projects for specific user
+   */
+  getAllProjects(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this._httpService.getCall('trackly/gets/projects').then((res) => {
+        let projects;
+        if (res && res['data']) {
+          projects = res['data'];
+        } else {
+          projects = [];
+        }
+        this.projectsSubject.next({
+          projects: projects
+        });
+        return resolve(projects);
+      }).catch((error) => {
+        console.log('Error to get project list', error);
+        this.projectsSubject.next({
+          projects: []
+        });
+        reject(error);
+      });
+    });
+  }
+
+  /**
+   * get all tasks for specific user
+   */
+  getAllTasks(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (localStorage.getItem('userInformation')) {
+        const userInfo = JSON.parse(localStorage.getItem('userInformation'));
+        if (userInfo['id']) {
+          const id = userInfo['id'];
+          this._httpService.getCall(
+            `/trackly/gets/tasks`
+          ).then((res) => {
+            if (res && res['data']) {
+              resolve(res['data']);
+            } else {
+              resolve([]);
+            }
+          }).catch((error) => {
+            reject(error);
+          });
+        } else {
+          reject();
+        }
+      } else {
+        reject();
+      }
+    });
+  }
+
+  /**
+   * raise tasks subscribe
+   */
+  getProjectsSubscribe(): Observable<any> {
+    return this.projectsSubject.asObservable();
+  }
+
+  /**
    * raise tasks subscribe
    */
   getTasksSubscribe(): Observable<any> {
@@ -220,6 +290,20 @@ export class DataService {
    */
   getTrackingSubscribe(): Observable<any> {
     return this.trackingSubject.asObservable();
+  }
+
+  /**
+   * select project subscribe
+   */
+  getSelectProjectSubject(): Observable<any> {
+    return this.selectProjectSubject.asObservable();
+  }
+
+  /**
+   * activity subscribe
+   */
+  getActivitySubject(): Observable<any> {
+    return this.activitySubject.asObservable();
   }
 
   /**
@@ -241,6 +325,9 @@ export class DataService {
    */
   setProject(project: Object) {
     this.currentProject = project;
+    this.selectProjectSubject.next({
+      project: this.currentProject
+    });
   }
 
   /**
@@ -254,8 +341,16 @@ export class DataService {
     this._httpService.postCall(
       'trackly/create/activity',
       activity
-    ).then(() => {
+    ).then((res) => {
       console.log('Activity creation is successful!');
+      if (res && res['data'] && res['data']['GENERATED_KEY']) {
+        this.activityId = res['data']['GENERATED_KEY'];
+      } else {
+        this.activityId = -1;
+      }
+      this.activitySubject.next({
+        activityId: this.activityId
+      });
       this.clearData();
     }).catch((err) => {
       console.log('Activity creation error', err);
@@ -406,6 +501,50 @@ export class DataService {
           return;
         }
       }
+    });
+  }
+
+  /**
+   * add a note
+   * @param note: note
+   */
+  addNote(note: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (this.activityId >= 0) {
+        this._httpService.postCall(
+          'trackly/note/activity_note',
+          {
+            activity_id: this.activityId,
+            note: note
+          }
+        ).then(() => {
+          console.log('Adding a note is successful!');
+          resolve();
+        }).catch((err) => {
+          console.log('Add a note error', err);
+          reject(err);
+        });
+      } else {
+        reject();
+      }
+    });
+  }
+
+  /**
+   * get setting data
+   */
+  getSetting(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this._httpService.getCall('trackly/gets/settings/widget_settings').then((res) => {
+        if (res && res['data']) {
+          resolve(res['data']);
+        } else {
+          reject();
+        }
+      }).catch((error) => {
+        console.log('Error to get project list', error);
+        reject(error);
+      });
     });
   }
 }

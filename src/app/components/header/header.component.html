@@ -6,8 +6,8 @@
     <!-- Logo Content end -->
 
     <!-- Project information start -->
-    <div>
-      UI 12:20
+    <div *ngIf="projectCode">
+      {{ projectCode }} 12:20
     </div>
     <!-- Project information end -->
   </a>
@@ -69,8 +69,8 @@
     </button>
     <!-- Timer end -->
 
-    <button mat-menu-item [matMenuTriggerFor]="switch_projects">Switch Projects</button>
-    <button mat-menu-item (click)="addNote()">Add a note</button>
+    <button mat-menu-item [matMenuTriggerFor]="switch_projects" *ngIf="isProjectMenu">Switch Projects</button>
+    <button mat-menu-item (click)="addNote()" [disabled]="!isAddNote">Add a note</button>
     <a class="none-underline" mat-menu-item [routerLink]="['/dashboard']">Open Dashboard</a>
     <a class="none-underline" mat-menu-item [routerLink]="['/setting']">Settings</a>
     <a class="none-underline" mat-menu-item [routerLink]="['/about']">About Track.ly</a>
@@ -81,10 +81,10 @@
   </mat-menu>
 
   <mat-menu #switch_projects="matMenu">
-    <ng-container *ngFor="let mainItem of my_menu | objectKey">
-      <button mat-menu-item [matMenuTriggerFor]="sub_menu">{{ mainItem }}</button>
+    <ng-container *ngFor="let projectItemKey of projectsMenu | objectKey">
+      <button mat-menu-item [matMenuTriggerFor]="sub_menu">{{ projectsMenu[projectItemKey]['name'] }}</button>
       <mat-menu #sub_menu="matMenu">
-        <button *ngFor="let subItem of my_menu[mainItem]" mat-menu-item>{{ subItem }}</button>
+        <a class="none-underline" *ngFor="let taskItem of projectsMenu[projectItemKey]['tasks']" mat-menu-item>{{ taskItem }}</a>
       </mat-menu>
     </ng-container>
   </mat-menu>

@@ -1,22 +1,22 @@
-<div class="setting-container p-3 d-flex flex-column justify-content-around">
+<div class="setting-container p-3 d-flex flex-column justify-content-around" *ngIf="isLoad">
   <h2>Setting</h2>
   <!-- Timer handler start -->
   <div class="timer-handler d-flex align-items-center">
     <mat-radio-group [(ngModel)]="isShowTimer" class="d-flex flex-row justify-content-between">
-      <mat-radio-button class="flex-fill" [value]="true">Show Timer</mat-radio-button>
-      <mat-radio-button class="ml-3 flex-fill" [value]="false">Hide Timer</mat-radio-button>
+      <mat-radio-button [value]="true">Show Timer</mat-radio-button>
+      <mat-radio-button class="ml-3" [value]="false">Hide Timer</mat-radio-button>
     </mat-radio-group>
   </div>
   <!-- Timer handler end -->
 
   <!-- Notify handler start for screenshot -->
-  <div class="screenshot-notify-handler d-flex flex-row justify-content-between align-items-center">
+  <div class="screenshot-notify-handler d-flex flex-row align-items-center">
     <div class="label">
       Notify me before taking a screenshot
     </div>
-    <mat-radio-group [(ngModel)]="isNotify" class="d-flex flex-row justify-content-around">
+    <mat-radio-group [(ngModel)]="isNotify" class="d-flex flex-row justify-content-around ml-3">
       <mat-radio-button [value]="false">No</mat-radio-button>
-      <mat-radio-button [value]="true">Yes</mat-radio-button>
+      <mat-radio-button class="ml-3" [value]="true">Yes</mat-radio-button>
     </mat-radio-group>
   </div>
   <!-- Notify handler end -->
@@ -29,13 +29,13 @@
 
     <div class="wrapper flex-fill d-flex flex-column justify-content-around">
       <!-- Date schedule handler start -->
-      <div class="day-schedule-handler d-flex flex-row align-items-center justify-content-between mb-3">
-        <div class="flex-fill">Notify me to track time on</div>
-        <div class="flex-fill">
+      <div class="day-schedule-handler d-flex flex-row align-items-center mb-3">
+        <div>Notify me to track time on</div>
+        <div class="ml-3">
           <mat-form-field>
-            <mat-select>
-              <mat-option *ngFor="let item of timeSchedules" [value]="item.value">
-                {{ item.label }}
+            <mat-select placeholder="Everyday" multiple [(ngModel)]="tracks">
+              <mat-option *ngFor="let item of timeSchedules" [value]="item" class="text-capitalize">
+                {{ item }}
               </mat-option>
             </mat-select>
           </mat-form-field>
@@ -44,16 +44,16 @@
       <!-- Date schedule handler end -->
   
       <!-- Time schedule handler start -->
-      <div class="time-schedule-handler d-flex flex-row align-items-center justify-content-between mb-3">
+      <div class="time-schedule-handler d-flex flex-row align-items-center mb-3">
         <div>Between</div>
-        <div>
+        <div class="ml-3">
           <mat-form-field>
             <input matInput [ngxTimepicker]="fromPicker">
             <ngx-material-timepicker #fromPicker></ngx-material-timepicker>
           </mat-form-field>
         </div>
-        <div>To</div>
-        <div>
+        <div class="ml-3">To</div>
+        <div class="ml-3">
           <mat-form-field>
             <input matInput [ngxTimepicker]="toPicker">
             <ngx-material-timepicker #toPicker></ngx-material-timepicker>
@@ -67,7 +67,7 @@
         <div class="mr-3">
           If not tracked for
         </div>
-  
+
         <div>
           <mat-form-field>
             <input matInput [(ngModel)]="trackInterval">
@@ -81,7 +81,7 @@
   <!-- Notify handler end for schedule -->
 
   <div>
-    <button class="mr-3" mat-raised-button color="primary">Update</button>
+    <button class="mr-3" mat-raised-button color="primary" (click)="update()">Update</button>
     <button mat-raised-button color="" (click)="cancel()">Cancel</button>
   </div>
 </div>

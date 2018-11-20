@@ -37,7 +37,7 @@ export class LoginComponent implements OnInit {
     });
 
     // reset login status
-    localStorage.removeItem('userToken');
+    localStorage.removeItem('userInformation');
 
     // get return url from route parameters or default to '/'
     // this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/home';
@@ -66,8 +66,10 @@ export class LoginComponent implements OnInit {
         password: this.f.password.value
     }).then((res) => {
       console.log(res);
-      localStorage.setItem('userToken', this.f.email.value);
-      this.router.navigate([this.returnUrl]);
+      if (res['data']) {
+        localStorage.setItem('userInformation', JSON.stringify(res['data']));
+        this.router.navigate([this.returnUrl]);
+      }
     }).catch((err) => {
       console.log('Login Error: ', err);
       this.alertService.error('Wrong email or password.');

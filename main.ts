@@ -3,6 +3,7 @@ import * as ioHook from 'iohook';
 import * as path from 'path';
 import * as url from 'url';
 import { CronJob } from 'cron';
+const NotificationCenter = require('node-notifier').NotificationCenter;
 let win, serve, size, isTrack, keyboardCount, mouseCount, timerHandlers;
 let takeScreenshotEvent, createNewActivityEvent, trayControlEvent, cronjobHandler, tray;
 let contextMenu, currentTaskId, currentProjectId, selectedTaskId, selectedProjectId, previousTimestamp;
@@ -42,7 +43,6 @@ function createWindow() {
     // width: size.width,
     // height: size.height
   });
-
 
   if (serve) {
     require('electron-reload')(__dirname, {
@@ -104,6 +104,7 @@ function createWindow() {
 
   tray.setToolTip('Time Tracker');
   tray.setContextMenu(contextMenu);
+  customNotify('Hello', 'Nice to meet you');
 
   win.webContents.openDevTools();
 
@@ -116,6 +117,24 @@ function createWindow() {
     win = null;
   });
 
+}
+
+/**
+ * notification function
+ * @param title: notification title
+ * @param message: notification message
+ */
+function customNotify(title, message) {
+  const notifier = new NotificationCenter({
+    withFallback: false, // use Growl if <= 10.8?
+    customPath: void 0 // Relative path if you want to use your fork of terminal-notifier
+  });
+
+  notifier.notify({
+    title: title,
+    message: message
+  }, (err, res) => {
+  });
 }
 
 /**

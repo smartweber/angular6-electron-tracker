@@ -8,9 +8,12 @@
   </mat-dialog-content>
 
   <mat-dialog-actions>
+    <div class="alert alert-danger full-width" *ngIf="error">
+      {{ error }}
+    </div>
     <div class="note-action-container">
-      <button mat-stroked-button mat-dialog-close color="warn" (click)="cancel()">Cancel</button>
-      <button mat-stroked-button mat-dialog-close color="primary" (click)="addNote()">Add Note</button>
+      <button mat-stroked-button color="warn" (click)="cancel()">Cancel</button>
+      <button mat-stroked-button color="primary" (click)="addNote()">Add Note</button>
     </div>
   </mat-dialog-actions>
   </div>

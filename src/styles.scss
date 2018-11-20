@@ -30,6 +30,10 @@ button:focus {
     text-decoration: none !important;
 }
 
+label.mat-radio-label {
+    margin: 0;
+}
+
 .mat-menu-item {
     &.engagement-container {
         height: auto;

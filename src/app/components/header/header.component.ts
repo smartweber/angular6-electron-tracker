@@ -14,13 +14,16 @@ import { NoteComponent } from '../modals/note/note.component';
 })
 export class HeaderComponent implements OnInit, OnDestroy {
   isLogin: boolean; // user login flag
-  isRunTimer: boolean;
+  isRunTimer: boolean; // run timer flag
+  isProjectMenu: boolean; // project menu flag
+  isAddNote: boolean; // add note flag
+  projectCode: string; // project code
+  projectsMenu: Object; // project list menu
   sub: Subscription; // router navigation subscription
   trackingSub: Subscription; // tracking subscription
-  my_menu = {
-    'main1': ['sub1', 'sub2'],
-    'main2': ['sub1', 'sub2'],
-  };
+  projectsSub: Subscription; // projects subscription
+  selectProjectSub: Subscription; // select project subscription
+  acitivitySub: Subscription; // acitivity subscription
 
   constructor(
     private router: Router,
@@ -29,6 +32,10 @@ export class HeaderComponent implements OnInit, OnDestroy {
     private _electronService: ElectronService
   ) {
     this.isRunTimer = false;
+    this.isProjectMenu = false;
+    this.isAddNote = false;
+    this.projectsMenu = {};
+    this.projectCode = '';
   }
 
   ngOnInit() {
@@ -46,6 +53,55 @@ export class HeaderComponent implements OnInit, OnDestroy {
       console.log('--tracking:', res);
       this.isRunTimer = res['isTracking'];
     });
+
+    /**
+     * projects subscription listener
+     */
+    this.projectsSub = this._dataService.getProjectsSubscribe().subscribe(res => {
+      this.isProjectMenu = false;
+      this.projectsMenu = {};
+      if (res['projects'].length > 0) {
+        for (let index = 0; index < res['projects'].length; index ++) {
+          this.projectsMenu[res['projects'][index]['id']] = {
+            name: res['projects'][index]['name'],
+            tasks: []
+          };
+        }
+
+        this._dataService.getAllTasks().then((tasks) => {
+          if (tasks.length > 0) {
+            for (let taskIndex = 0; taskIndex < tasks.length; taskIndex ++) {
+              const projectId = parseInt(tasks[taskIndex]['project_id'], 10);
+              if (this.projectsMenu[projectId]) {
+                this.projectsMenu[projectId]['tasks'].push(tasks[taskIndex]['description']);
+              }
+            }
+          }
+
+          this.isProjectMenu = true;
+        });
+      } else {
+        this.isProjectMenu = true;
+      }
+    });
+
+    /**
+     * select project subscription listener
+     */
+    this.selectProjectSub = this._dataService.getSelectProjectSubject().subscribe(res => {
+      this.projectCode = res['project']['code'] ? res['project']['code'] : '';
+    });
+
+    /**
+     * activity subscription listener
+     */
+    this.acitivitySub = this._dataService.getActivitySubject().subscribe(res => {
+      if (res && res['activityId']) {
+        this.isAddNote = true;
+      } else {
+        this.isAddNote = false;
+      }
+    });
   }
 
   ngOnDestroy() {
@@ -57,13 +113,25 @@ export class HeaderComponent implements OnInit, OnDestroy {
     if (this.trackingSub) {
       this.trackingSub.unsubscribe();
     }
+
+    if (this.projectsSub) {
+      this.projectsSub.unsubscribe();
+    }
+
+    if (this.selectProjectSub) {
+      this.selectProjectSub.unsubscribe();
+    }
+
+    if (this.acitivitySub) {
+      this.acitivitySub.unsubscribe();
+    }
   }
 
   /**
    * init data
    */
   initData() {
-    if (localStorage.getItem('userToken')) {
+    if (localStorage.getItem('userInformation')) {
       this.isLogin = true;
     } else {
       this.isLogin = false;
@@ -74,7 +142,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
    * logout the user
    */
   logout() {
-    localStorage.removeItem('userToken');
+    localStorage.removeItem('userInformation');
     if (this._dataService.isTracking) {
       this._dataService.stopTrack();
     }
