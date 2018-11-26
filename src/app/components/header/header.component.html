@@ -6,8 +6,18 @@
     <!-- Logo Content end -->
 
     <!-- Project information start -->
-    <div *ngIf="projectCode">
-      {{ projectCode }} 12:20
+    <div *ngIf="projectCode" class="d-flex flex-row">
+      <!-- Project code start -->
+      <div class="mr-2">
+        {{ projectCode }}
+      </div>
+      <!-- Project code end -->
+
+      <!-- Timer start -->
+      <div *ngIf="isShowTimer">
+        {{ projectTimer }}
+      </div>
+      <!-- Timer end -->
     </div>
     <!-- Project information end -->
   </a>
@@ -16,7 +26,7 @@
   <!-- Menu start -->
   <mat-menu #main_menu="matMenu">
     <!-- Engagement start-->
-    <button class="engagement-container" mat-menu-item>
+    <button class="engagement-container" mat-menu-item *ngIf="isEngagement">
       <div class="engagement-wrapper p-2">
         <!-- Engagement title start-->
         <div class="title">Engagement</div>
@@ -24,17 +34,17 @@
 
         <!-- Engagement percentage start-->
         <div class="percentage-wrapper">
-          <div class="average">34%</div>
+          <div class="average">{{ engagementPer }}%</div>
           <div class="tick">
             <mat-icon>arrow_drop_up</mat-icon>
-            2%
+            {{ engagementTickPer }}%
           </div>
         </div>
         <!-- Engagement percentage start-->
 
         <!-- During start-->
         <div class="during-wrapper">
-          (09:00AM - 10:00AM)
+          {{ engagementDuring }}
         </div>
         <!-- During end-->
       </div>
@@ -42,7 +52,7 @@
     <!-- Engagement end-->
 
     <!-- Timer start -->
-    <button class="timer-container" mat-menu-item>
+    <button class="timer-container" mat-menu-item [disabled]="!isSelectedTask && !isRunTimer" (click)="timerHandler()">
       <div class="timer-wrapper">
         <!-- Timer status start -->
         <div

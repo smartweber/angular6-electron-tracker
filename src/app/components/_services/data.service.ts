@@ -12,17 +12,27 @@ export class DataService {
   activityId: number; // activity id
   tasks: Object[]; // tasks
   screenshotUrls: Object[]; // screenshot urls for one activity
+  projectSettings: Object[]; // project settings
   currentProject: Object; // current project detail
+  currentSetting: Object; // setting data
   currentProjectId: number; // current project id
   currentTaskId: number; // current task id
   selectedTaskId: number; // selected task id
   selectedProjectId: number; // selected project id
+  lastEngagementPer: number; // last engagement percentage
+  currentEngagementPer: number; // current engagement percentage
+  lastEngagementHour: number; // last engagement hour
+  currentEngagementHour: number; // current engagement hour
+  projectTime: number; // project time
 
   private projectsSubject: Subject<any>; // projects subscription
   private tasksSubject: Subject<any>; // tasks subscription
   private trackingSubject: Subject<any>; // tasks subscription
   private selectProjectSubject: Subject<any>; // selected project subject
   private activitySubject: Subject<any>; // selected project subject
+  private settingSubject: Subject<any>; // setting subject
+  private selectTaskSubject: Subject<any>; // select task subject
+  private engagementSubject: Subject<any>; // select task subject
 
   constructor(
     private _electronService: ElectronService,
@@ -30,6 +40,7 @@ export class DataService {
   ) {
     this.screenshotUrls = [];
     this.tasks = [];
+    this.projectSettings = [];
     this.windowWidth = 0;
     this.windowHeight = 0;
     this.currentProjectId = -1;
@@ -38,13 +49,24 @@ export class DataService {
     this.selectedProjectId = -1;
     this.activityId = -1;
     this.currentProject = {};
+    this.currentSetting = {};
     this.projectsSubject = new Subject();
     this.tasksSubject = new Subject();
     this.trackingSubject = new Subject();
     this.selectProjectSubject = new Subject();
     this.activitySubject = new Subject();
+    this.settingSubject = new Subject();
+    this.selectTaskSubject = new Subject();
+    this.engagementSubject = new Subject();
     this.isTakingScreenShot = false;
     this.isTracking = false;
+    this.lastEngagementPer = 0;
+    this.currentEngagementPer = 0;
+    this.lastEngagementHour = 0;
+    this.currentEngagementHour = 0;
+    this.projectTime = 0;
+
+    this.getSetting();
   }
 
   /**
@@ -82,12 +104,30 @@ export class DataService {
       });
 
       /**
+       * get engagement data
+       */
+      this._electronService.ipcRenderer.send('get-engagement', 'ping');
+      this._electronService.ipcRenderer.on('get-engagement-reply', (event, arg) => {
+        this.currentEngagementHour = parseInt(arg['currentEngageTime'], 10);
+        this.currentEngagementPer = parseInt(arg['engagementPer'], 10);
+        this.engagementSubject.next({
+          currentEngagementHour: this.currentEngagementHour,
+          currentEngagementPer: this.currentEngagementPer,
+          lastEngagementPer: this.lastEngagementPer
+        });
+      });
+
+      /**
        * get selected project and task id event
        */
       this._electronService.ipcRenderer.send('get-selected-ids', 'ping');
       this._electronService.ipcRenderer.on('get-selected-ids-reply', (event, arg) => {
         this.selectedTaskId = parseInt(arg.selectedTaskId, 10);
         this.selectedProjectId = parseInt(arg.selectedProjectId, 10);
+        this.selectTaskSubject.next({
+          selectedTaskId: this.selectedTaskId,
+          selectedProjectId: this.selectedProjectId
+        });
         this.setTasksSubscribe();
       });
 
@@ -155,6 +195,10 @@ export class DataService {
         this.trackingSubject.next({
           isTracking: this.isTracking
         });
+        this.selectTaskSubject.next({
+          selectedTaskId: this.selectedTaskId,
+          selectedProjectId: this.selectedProjectId
+        });
 
         if (this.tasks.length > 0) {
           for (let index = 0; index < this.tasks.length; index ++) {
@@ -168,6 +212,17 @@ export class DataService {
             this.postActivity(arg);
           });
         }
+      });
+
+      /**
+       * select project response for timer
+       */
+      this._electronService.ipcRenderer.on('select-project-reply', (event, arg) => {
+        this.projectTime = arg['during'];
+        this.selectProjectSubject.next({
+          project: this.currentProject,
+          time: this.projectTime
+        });
       });
     }
   }
@@ -217,6 +272,33 @@ export class DataService {
   }
 
   /**
+   * get all project settings
+   */
+  getAllProjectSettings(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this._httpService.getCall('trackly/project-settings').then((res) => {
+        if (res && res['data']) {
+          this.projectSettings = res['data'];
+        } else {
+          this.projectSettings = [];
+        }
+
+        this._electronService.ipcRenderer.send('get-all-projects', {
+          projects: this.projectSettings
+        });
+        return resolve(this.projectSettings);
+      }).catch((error) => {
+        console.log('Error to get project list', error);
+        this.projectSettings = [];
+        this.projectsSubject.next({
+          projects: this.projectSettings
+        });
+        reject(error);
+      });
+    });
+  }
+
+  /**
    * get projects for specific user
    */
   getAllProjects(): Promise<any> {
@@ -250,7 +332,6 @@ export class DataService {
       if (localStorage.getItem('userInformation')) {
         const userInfo = JSON.parse(localStorage.getItem('userInformation'));
         if (userInfo['id']) {
-          const id = userInfo['id'];
           this._httpService.getCall(
             `/trackly/gets/tasks`
           ).then((res) => {
@@ -307,6 +388,27 @@ export class DataService {
   }
 
   /**
+   * setting subscribe
+   */
+  getSettingSubject(): Observable<any> {
+    return this.settingSubject.asObservable();
+  }
+
+  /**
+   * select task subsribe
+   */
+  getSelectTaskSubject(): Observable<any> {
+    return this.selectTaskSubject.asObservable();
+  }
+
+  /**
+   * engagement subsribe
+   */
+  getEngagementSubject(): Observable<any> {
+    return this.engagementSubject.asObservable();
+  }
+
+  /**
    * send tasks subscribe
    */
   setTasksSubscribe() {
@@ -320,12 +422,24 @@ export class DataService {
   }
 
   /**
+   * set last engagement percentage
+   * @param per: engagement percentage
+   */
+  setLastEngagementPer(per: number) {
+    this.lastEngagementPer = per;
+  }
+
+  /**
    * set project data
    * @param project: project data
    */
   setProject(project: Object) {
     this.currentProject = project;
     this.selectProjectSubject.next({
+      project: this.currentProject,
+      time: this.projectTime
+    });
+    this._electronService.ipcRenderer.send('select-project', {
       project: this.currentProject
     });
   }
@@ -354,11 +468,13 @@ export class DataService {
       this.clearData();
     }).catch((err) => {
       console.log('Activity creation error', err);
-      if (nCount < 20) {
+      if (err) {
+        if (nCount < 20) {
           nCount ++;
           setTimeout(() => {
             this.postActivity(activity, nCount);
-          }, 5 * 60 * 1000);
+          }, 5 * 60 * 1000); // retry in 5 mins
+        }
       }
     });
   }
@@ -536,14 +652,42 @@ export class DataService {
   getSetting(): Promise<any> {
     return new Promise((resolve, reject) => {
       this._httpService.getCall('trackly/gets/settings/widget_settings').then((res) => {
+        console.log('setting data:', res);
         if (res && res['data']) {
+          this.currentSetting = res['data'];
           resolve(res['data']);
         } else {
+          this.currentSetting = {};
           reject();
         }
+        this.settingSubject.next(this.currentSetting);
+        this._electronService.ipcRenderer.send('update-setting', {
+          setting: this.currentSetting
+        });
       }).catch((error) => {
         console.log('Error to get project list', error);
+        this.currentSetting = {};
+        this.settingSubject.next(this.currentSetting);
+        this._electronService.ipcRenderer.send('update-setting', {
+          setting: this.currentSetting
+        });
         reject(error);
+      });
+    });
+  }
+
+  /**
+   * update the setting
+   * @param setting: setting data
+   */
+  updateSetting(setting: Object): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this._httpService.postCall('/trackly/settings/widget_settings', setting).then((res) => {
+        console.log('Updating setting is successful!', res);
+        this.getSetting();
+        resolve();
+      }).catch((error) => {
+        reject();
       });
     });
   }

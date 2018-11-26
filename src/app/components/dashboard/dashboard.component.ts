@@ -25,7 +25,7 @@ export class DashboardComponent implements OnInit {
     /**
      * get project list
      */
-    this._dataService.getAllProjects().then((projects) => {
+    this._dataService.getAllProjectSettings().then((projects) => {
       console.log('project list: ', projects);
       this.projects = projects;
       this.isLoad = true;

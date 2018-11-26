@@ -2,20 +2,20 @@
   height: calc( 100% - 64px );
 
   .setting-container {
-    height: 100%;
 
     .timer-handler {
-      flex: 1 0 auto;
       border-bottom: 1px solid #cdcdcd;
     }
 
     .screenshot-notify-handler {
-      flex: 1 0 auto;
       border-bottom: 1px solid #cdcdcd;
     }
 
     .schedule-notify-handler {
-      flex: 3 0 auto;
     }
+  }
+
+  .loading-container {
+    height: 100%;
   }
 }

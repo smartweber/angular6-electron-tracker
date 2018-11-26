@@ -28,8 +28,15 @@ export class HttpService {
         }
       }).catch((err) => {
         console.log(err);
-        this.handleUnAuthetication();
-        reject(err);
+        let errorReject = false;
+        if (err.response.status === 401) {
+          this.handleUnAuthetication();
+          errorReject = false;
+        } else {
+          errorReject = true;
+        }
+
+        reject(errorReject);
       });
     });
   }
@@ -49,8 +56,16 @@ export class HttpService {
           reject();
         }
       }).catch((err) => {
-        this.handleUnAuthetication();
-        reject(err);
+        console.log(err);
+        let errorReject = false;
+        if (err.response.status === 401) {
+          this.handleUnAuthetication();
+          errorReject = false;
+        } else {
+          errorReject = true;
+        }
+
+        reject(errorReject);
       });
     });
   }
@@ -79,14 +94,26 @@ export class HttpService {
             reject();
           }
         }).catch((err) => {
-          this.handleUnAuthetication();
-          reject(err);
+          console.log(err);
+          let errorReject = false;
+          if (err.response.status === 401) {
+            this.handleUnAuthetication();
+            errorReject = false;
+          } else {
+            errorReject = true;
+          }
+
+          reject(errorReject);
         });
     });
   }
 
+  /**
+   * handle un-authentication
+   * @param statusCode: status code
+   */
   handleUnAuthetication() {
-    // localStorage.removeItem('userToken');
-    // this.router.navigate(['/login']);
+    localStorage.removeItem('userInformation');
+    this.router.navigate(['/login']);
   }
 }

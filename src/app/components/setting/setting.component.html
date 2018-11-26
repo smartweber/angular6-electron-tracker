@@ -1,30 +1,30 @@
-<div class="setting-container p-3 d-flex flex-column justify-content-around" *ngIf="isLoad">
+<div class="setting-container p-3 d-flex flex-column justify-content-around" *ngIf="isLoad; else loadEle">
   <h2>Setting</h2>
   <!-- Timer handler start -->
-  <div class="timer-handler d-flex align-items-center">
+  <div class="timer-handler d-flex align-items-center py-3">
     <mat-radio-group [(ngModel)]="isShowTimer" class="d-flex flex-row justify-content-between">
-      <mat-radio-button [value]="true">Show Timer</mat-radio-button>
-      <mat-radio-button class="ml-3" [value]="false">Hide Timer</mat-radio-button>
+      <mat-radio-button color="primary" [value]="true">Show Timer</mat-radio-button>
+      <mat-radio-button color="primary" class="ml-3" [value]="false">Hide Timer</mat-radio-button>
     </mat-radio-group>
   </div>
   <!-- Timer handler end -->
 
   <!-- Notify handler start for screenshot -->
-  <div class="screenshot-notify-handler d-flex flex-row align-items-center">
+  <div class="screenshot-notify-handler d-flex flex-row align-items-center py-3">
     <div class="label">
       Notify me before taking a screenshot
     </div>
-    <mat-radio-group [(ngModel)]="isNotify" class="d-flex flex-row justify-content-around ml-3">
-      <mat-radio-button [value]="false">No</mat-radio-button>
-      <mat-radio-button class="ml-3" [value]="true">Yes</mat-radio-button>
+    <mat-radio-group [(ngModel)]="isNotifyScreenshot" class="d-flex flex-row justify-content-around ml-3">
+      <mat-radio-button color="primary" [value]="false">No</mat-radio-button>
+      <mat-radio-button color="primary" class="ml-3" [value]="true">Yes</mat-radio-button>
     </mat-radio-group>
   </div>
   <!-- Notify handler end -->
 
   <!-- Notify handler start for schedule -->
-  <div class="schedule-notify-handler d-flex flex-row">
+  <div class="schedule-notify-handler d-flex flex-row py-3">
     <!-- Schedule checkbox start -->
-    <mat-checkbox class="mr-3 d-flex align-items-center"></mat-checkbox>
+    <mat-checkbox color="primary" [(ngModel)]="isNotifyTrack" class="mr-3 d-flex align-items-center"></mat-checkbox>
     <!-- Schedule checkbox end -->
 
     <div class="wrapper flex-fill d-flex flex-column justify-content-around">
@@ -48,14 +48,24 @@
         <div>Between</div>
         <div class="ml-3">
           <mat-form-field>
-            <input matInput [ngxTimepicker]="fromPicker">
+            <input
+              matInput
+              [ngxTimepicker]="fromPicker"
+              [(ngModel)]="startTime"
+              [format]="24"
+            >
             <ngx-material-timepicker #fromPicker></ngx-material-timepicker>
           </mat-form-field>
         </div>
         <div class="ml-3">To</div>
         <div class="ml-3">
           <mat-form-field>
-            <input matInput [ngxTimepicker]="toPicker">
+            <input
+              matInput
+              [ngxTimepicker]="toPicker"
+              [(ngModel)]="endTime"
+              [format]="24"
+            >
             <ngx-material-timepicker #toPicker></ngx-material-timepicker>
           </mat-form-field>
         </div>
@@ -80,8 +90,24 @@
   </div>
   <!-- Notify handler end for schedule -->
 
+  <!-- Error alert start -->
+  <div class="alert alert-danger" *ngIf="errorAlert">
+    {{ errorAlert }}
+  </div>
+  <!-- Error alert end -->
+
+  <!-- Action start -->
   <div>
     <button class="mr-3" mat-raised-button color="primary" (click)="update()">Update</button>
     <button mat-raised-button color="" (click)="cancel()">Cancel</button>
   </div>
+  <!-- Action end -->
 </div>
+
+<!-- load start -->
+<ng-template #loadEle>
+  <div class="d-flex justify-content-center align-items-center loading-container">
+    <i class="fa fa-spinner fa-pulse fa-3x fa-fw"></i>
+  </div>
+</ng-template>
+<!-- load end -->

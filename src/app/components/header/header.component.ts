@@ -17,13 +17,24 @@ export class HeaderComponent implements OnInit, OnDestroy {
   isRunTimer: boolean; // run timer flag
   isProjectMenu: boolean; // project menu flag
   isAddNote: boolean; // add note flag
+  isSelectedTask: boolean; // select task flag
+  isShowTimer: boolean; // show timer flag
+  isEngagement: boolean; // engagement flag
   projectCode: string; // project code
+  projectTimer: string; // project time
+  engagementDuring: string; // engagement during
+  engagementPer: number; // engagement percentage
+  engagementTickPer: number; // engagement tick percenage
   projectsMenu: Object; // project list menu
+
   sub: Subscription; // router navigation subscription
   trackingSub: Subscription; // tracking subscription
   projectsSub: Subscription; // projects subscription
   selectProjectSub: Subscription; // select project subscription
   acitivitySub: Subscription; // acitivity subscription
+  settingSub: Subscription; // setting subscription
+  selectTaskSub: Subscription; // select task subscription
+  engagementSub: Subscription; // engagement subscription
 
   constructor(
     private router: Router,
@@ -34,8 +45,15 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.isRunTimer = false;
     this.isProjectMenu = false;
     this.isAddNote = false;
+    this.isShowTimer = false;
+    this.isSelectedTask = false;
+    this.isEngagement = false;
     this.projectsMenu = {};
     this.projectCode = '';
+    this.projectTimer = '';
+    this.engagementPer = 0;
+    this.engagementTickPer = 0;
+    this.engagementDuring = '';
   }
 
   ngOnInit() {
@@ -90,6 +108,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
      */
     this.selectProjectSub = this._dataService.getSelectProjectSubject().subscribe(res => {
       this.projectCode = res['project']['code'] ? res['project']['code'] : '';
+      const timeInMiniSecs = parseInt(res['time'], 10);
+      this.projectTimer = this.convertSeconds(Math.floor(timeInMiniSecs / 1000));
     });
 
     /**
@@ -101,6 +121,42 @@ export class HeaderComponent implements OnInit, OnDestroy {
       } else {
         this.isAddNote = false;
       }
+    });
+
+    /**
+     * seting subscription listener
+     */
+    this.settingSub = this._dataService.getSettingSubject().subscribe((setting: Object) => {
+      if (setting && setting.constructor === Object && Object.keys(setting).length > 0) {
+        this.isShowTimer = setting['show_timer'] ? true : false;
+      } else {
+        this.isShowTimer = false;
+      }
+    });
+
+    /**
+     * select task subscription listener
+     */
+    this.selectTaskSub = this._dataService.getSelectTaskSubject().subscribe(res => {
+      if (res['selectedTaskId'] >= 0 && res['selectedProjectId'] >= 0) {
+        this.isSelectedTask = true;
+      } else {
+        this.isSelectedTask = false;
+      }
+    });
+
+    /**
+     * engagement subscription listener
+     */
+    this.engagementSub = this._dataService.getEngagementSubject().subscribe(res => {
+      const startHour = this.formatDayHour(res['currentEngagementHour'] - 1);
+      const endHour = this.formatDayHour(res['currentEngagementHour']);
+      this.engagementDuring = `(${startHour} - ${endHour})`;
+      this.engagementPer = res['currentEngagementPer'];
+      const lastEngagementPer = res['lastEngagementPer'];
+      this.engagementTickPer = this.engagementPer - lastEngagementPer;
+      this.isEngagement = true;
+      this._dataService.setLastEngagementPer(this.engagementPer);
     });
   }
 
@@ -125,6 +181,48 @@ export class HeaderComponent implements OnInit, OnDestroy {
     if (this.acitivitySub) {
       this.acitivitySub.unsubscribe();
     }
+
+    if (this.settingSub) {
+      this.settingSub.unsubscribe();
+    }
+
+    if (this.selectTaskSub) {
+      this.selectTaskSub.unsubscribe();
+    }
+
+    if (this.engagementSub) {
+      this.engagementSub.unsubscribe();
+    }
+  }
+
+  /**
+   * format day hour
+   * @param hour: hour
+   */
+  formatDayHour(hour: number) {
+    if (hour < 0) {
+      return '11:00PM';
+    }
+
+    if (hour > 12) {
+      return `${hour - 12}:00PM`;
+    }
+
+    return `${hour}:00AM`;
+  }
+
+  /**
+   * convert seconds to hh:mm
+   * @param secs: seconds
+   */
+  convertSeconds(secs: number) {
+    const hours =  Math.floor(Math.floor(secs / 3600));
+    const minutes = Math.floor(Math.floor((secs - (hours * 3600)) / 60));
+    // const seconds = Math.floor((secs - ((secs * 3600) + (minutes * 60))) % 60);
+
+    const dHours = (hours > 9 ? hours : '0' + hours);
+    const dMins = (minutes > 9 ? minutes : '0' + minutes);
+    return dHours + ':' + dMins;
   }
 
   /**
@@ -171,6 +269,29 @@ export class HeaderComponent implements OnInit, OnDestroy {
     dialogRef.afterClosed().subscribe(result => {
       console.log(result);
     });
+  }
+
+  /**
+   * timer handler
+   */
+  timerHandler() {
+    if (!this.isRunTimer) { // run a timer
+      if (this._electronService.isElectron) {
+        this._electronService.ipcRenderer.send('start-track', {
+          projectId: this._dataService.selectedProjectId,
+          taskId: this._dataService.selectedTaskId
+        });
+      }
+    } else {
+      if (this._electronService.isElectron) {
+        if (this._electronService.isElectron) {
+          this._electronService.ipcRenderer.send('stop-track', {
+            taskId: this._dataService.selectedTaskId,
+            projectId: this._dataService.selectedProjectId
+          });
+        }
+      }
+    }
   }
 
 }

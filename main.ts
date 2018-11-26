@@ -2,11 +2,18 @@ import { app, BrowserWindow, screen, ipcMain, Tray, Menu } from 'electron';
 import * as ioHook from 'iohook';
 import * as path from 'path';
 import * as url from 'url';
+import * as moment from 'moment';
 import { CronJob } from 'cron';
-const NotificationCenter = require('node-notifier').NotificationCenter;
-let win, serve, size, isTrack, keyboardCount, mouseCount, timerHandlers;
-let takeScreenshotEvent, createNewActivityEvent, trayControlEvent, cronjobHandler, tray;
-let contextMenu, currentTaskId, currentProjectId, selectedTaskId, selectedProjectId, previousTimestamp;
+import { notify } from 'node-notifier';
+let win, serve, size, isTrack, keyboardCount, mouseCount, timerHandlers, settingData;
+let takeScreenshotEvent, createNewActivityEvent, trayControlEvent, tray, engagementEvent, selectProjectEvent;
+let engagementCronjobHandler, trackingCronjobHandler, checkTrackOnHandler;
+let contextMenu, currentTaskId, currentProjectId, selectedTaskId, selectedProjectId, previousTimestamp, focusProjectId;
+let idleSettingTime, lastTrackTimestamp, totalIdleTime, lastProjectTime, timeIntervalMins;
+let projectsDetail;
+lastTrackTimestamp = 0;
+lastProjectTime = 0;
+totalIdleTime = 0;
 const spanSeconds = 60;
 const args = process.argv.slice(1);
 isTrack = false;
@@ -16,9 +23,13 @@ currentTaskId = -1;
 currentProjectId = -1;
 selectedTaskId = -1;
 selectedProjectId = -1;
+focusProjectId = -1;
 previousTimestamp = 0;
+timeIntervalMins = 0;
 serve = args.some(val => val === '--serve');
 timerHandlers = [];
+settingData = {};
+projectsDetail = {};
 
 function createWindow() {
 
@@ -29,15 +40,15 @@ function createWindow() {
   win = new BrowserWindow({
     // x: 0,
     // y: 0,
-    width: 1280,
-    height: 720,
-    // width: 472,
-    // height: 667,
+    // width: 1280,
+    // height: 720,
+    width: 472,
+    height: 667,
     center: true,
     minWidth: 472,
     minHeight: 667,
-    // maxWidth: 472,
-    // maxHeight: 667,
+    maxWidth: 472,
+    maxHeight: 667,
     maximizable: false,
     minimizable: false
     // width: size.width,
@@ -104,9 +115,9 @@ function createWindow() {
 
   tray.setToolTip('Time Tracker');
   tray.setContextMenu(contextMenu);
-  customNotify('Hello', 'Nice to meet you');
+  initData();
 
-  win.webContents.openDevTools();
+  // win.webContents.openDevTools();
 
   // Emitted when the window is closed.
   win.on('closed', () => {
@@ -119,18 +130,40 @@ function createWindow() {
 
 }
 
+function initData() {
+  totalIdleTime = 0;
+  projectsDetail = {};
+}
+
+/**
+ * calculate idle time
+ */
+function calcuateIdleTime() {
+  if (lastTrackTimestamp !== 0) {
+    const diffInMin = Math.abs(lastTrackTimestamp - Date.now());
+    if (diffInMin > idleSettingTime * 60 * 1000) { // idle setting time is as a minute format
+      totalIdleTime += diffInMin;
+    }
+  }
+
+  lastTrackTimestamp = Date.now();
+}
+
+/**
+ * calculate engagement percentage
+ */
+function calculateEngagementPer() {
+  const hourInSeconds = 60 * 60 * 1000;
+  return Math.abs((hourInSeconds - totalIdleTime) / hourInSeconds * 100);
+}
+
 /**
  * notification function
  * @param title: notification title
  * @param message: notification message
  */
 function customNotify(title, message) {
-  const notifier = new NotificationCenter({
-    withFallback: false, // use Growl if <= 10.8?
-    customPath: void 0 // Relative path if you want to use your fork of terminal-notifier
-  });
-
-  notifier.notify({
+  notify({
     title: title,
     message: message
   }, (err, res) => {
@@ -167,6 +200,9 @@ function updateTracks(projectId, taskId, timestamp, isImmediate = false) {
   const newActivity = createNewActivity(projectId, taskId, timestamp);
   console.log('---create activity---');
   console.log(newActivity);
+  if (settingData['notify_me_screenshot']) {
+    customNotify('Time Tracker', 'Screenshot taken');
+  }
   createNewActivityEvent.sender.send('create-new-activity-reply', newActivity);
 }
 
@@ -251,6 +287,63 @@ function clearData() {
   stopInterval();
 }
 
+function checkWeekday(weekDayString) {
+  const currentWeekday = moment().isoWeekday();
+  const defaultWeekDays = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const weekDays = weekDayString.trim().toLowerCase().split(',');
+  return (weekDays.indexOf(defaultWeekDays[currentWeekday]) > -1);
+}
+
+/**
+ * check track on status
+ */
+function checkTrackOnStatus() {
+  if (settingData['untracked_for_in_min']) {
+    if (checkTrackOnHandler) {
+      clearInterval(checkTrackOnHandler);
+    }
+
+    const interval = parseInt(settingData['untracked_for_in_min'], 10) * 60 * 1000;
+    checkTrackOnHandler = setInterval(() => {
+      if (settingData['notify_me_track_on'] && checkWeekday(settingData['track_on'])) {
+        if (!isTrack) {
+          customNotify('Time Tracker', 'Rimnider: You\'re not tracking time.');
+        }
+      }
+    }, interval);
+  }
+}
+
+function createTrackingCronJob() {
+  if (timeIntervalMins >= 60) {
+    console.log('Tracking interval is greater than 60');
+    return;
+  }
+
+  if (trackingCronjobHandler) {
+    trackingCronjobHandler.stop();
+  }
+
+  trackingCronjobHandler = new CronJob('0 */' + timeIntervalMins + ' * * * *', () => {
+    console.log('tracking cronjob running:');
+    // increase timer
+    if (projectsDetail.hasOwnProperty(focusProjectId)) {
+      const current = Date.now();
+      const diffInMiniSecs = current - lastProjectTime;
+      projectsDetail[focusProjectId]['time'] += diffInMiniSecs;
+      lastProjectTime = current;
+      selectProjectEvent.sender.send('select-project-reply', {
+        projectId: focusProjectId,
+        during: projectsDetail[focusProjectId]['time']
+      });
+    }
+
+    if (isTrack) {
+      updateTracks(currentProjectId, currentTaskId, Date.now());
+    }
+  }, null, true);
+}
+
 /**
  * destroy ipcMain listeners and cron job handler
  */
@@ -265,10 +358,20 @@ function destroyListners() {
     ipcMain.removeAllListeners('stop-track');
     ipcMain.removeAllListeners('create-new-activity');
     ipcMain.removeAllListeners('tray-icon-control');
+    ipcMain.removeAllListeners('get-engagement');
+    ipcMain.removeAllListeners('select-project');
   }
 
-  if (cronjobHandler) {
-    cronjobHandler.stop();
+  if (trackingCronjobHandler) {
+    trackingCronjobHandler.stop();
+  }
+
+  if (engagementCronjobHandler) {
+    engagementCronjobHandler.stop();
+  }
+
+  if (checkTrackOnHandler) {
+    clearInterval(checkTrackOnHandler);
   }
 }
 
@@ -308,7 +411,7 @@ try {
     }
   });
 
-  app.on('before-quit', function (evt) {
+  app.on('before-quit', (evt) => {
     if (tray) {
       tray.destroy();
       tray = null;
@@ -319,14 +422,31 @@ try {
   });
 
   /**
-   * Cron Job for interval event
+   * Cron Job for Engagement
    */
-  cronjobHandler = new CronJob('0 */1 * * * *', function() {
-    console.log('cronjob running:');
-    if (isTrack) {
-      updateTracks(currentProjectId, currentTaskId, Date.now());
+  engagementCronjobHandler = new CronJob('0 0 */1 * * *', () => {
+    console.log('engagement cronjob running:');
+    const engagementPer = calculateEngagementPer();
+
+    engagementEvent.sender.send('get-engagement-reply', {
+      engagementPer: engagementPer,
+      currentEngageTime: moment().format('H')
+    });
+    totalIdleTime = 0;
+
+    // check the reset time
+    const currentTime = new Date();
+    const currentHours = currentTime.getHours();
+    const currentMinutes = currentTime.getMinutes();
+
+    if (currentHours === 0 && currentMinutes === 0) {
+      for (const key in projectsDetail) {
+        if (projectsDetail.hasOwnProperty(key)) {
+          projectsDetail[key]['time'] = 0;
+        }
+      }
     }
-  }, null, true, 'America/Los_Angeles');
+  }, null, true);
 
   /**
    * ipcMain lisner to get current task id and project id
@@ -409,6 +529,7 @@ try {
     }
 
     isTrack = true;
+    lastTrackTimestamp = Date.now();
 
     if (contextMenu) {
       contextMenu.items[0].enabled = false;
@@ -446,6 +567,63 @@ try {
   });
 
   /**
+   * ipcMain lisner to update setting
+   */
+  ipcMain.on('update-setting', (event, arg) => {
+    settingData = arg['setting'];
+    checkTrackOnStatus();
+  });
+
+  /**
+   * ipcMain lisner to select project
+   */
+  ipcMain.on('select-project', (event, arg) => {
+    const current = Date.now();
+    selectProjectEvent = event;
+
+    if (arg['project']['id']) { // if project is selected
+      idleSettingTime = arg['project']['ideal_time_interval_mins'] ? parseInt(arg['project']['ideal_time_interval_mins'], 10) : 0;
+      timeIntervalMins = arg['project']['time_interval_mins'] ? parseInt(arg['project']['time_interval_mins'], 10) : 0;
+      createTrackingCronJob();
+      lastProjectTime = current;
+      focusProjectId = arg['project']['id'] ? arg['project']['id'] : -1;
+      selectProjectEvent.sender.send('select-project-reply', {
+        projectId: focusProjectId,
+        during: projectsDetail[focusProjectId]['time']
+      });
+    } else { // if any project is not selected
+      if (focusProjectId > -1) { // if there is previous selected project
+        if (focusProjectId && projectsDetail.hasOwnProperty(focusProjectId)) {
+          const diffInMiniSecs = current - lastProjectTime;
+          projectsDetail[focusProjectId]['time'] += diffInMiniSecs;
+          selectProjectEvent.sender.send('select-project-reply', {
+            projectId: focusProjectId,
+            during: projectsDetail[focusProjectId]['time']
+          });
+          focusProjectId = -1;
+        }
+      }
+    }
+  });
+
+  /**
+   * ipcMain lisner to get all projects
+   */
+  ipcMain.on('get-all-projects', (event, arg) => {
+    if (arg['projects'] && arg['projects'].length > 0) {
+      for (let index = 0; index < arg['projects'].length; index ++) {
+        if (arg['projects'][index] && arg['projects'][index]['id']) {
+          if (!projectsDetail.hasOwnProperty(arg['projects'][index]['id'])) {
+            projectsDetail[arg['projects'][index]['id']] = {
+              time: 0
+            };
+          }
+        }
+      }
+    }
+  });
+
+  /**
    * ipcMain lisner to get event of tray icon control
    */
   ipcMain.on('tray-icon-control', (event, arg) => {
@@ -460,11 +638,25 @@ try {
   });
 
   /**
+   * ipcMain lisner to get event of engagement
+   */
+  ipcMain.on('get-engagement', (event, arg) => {
+    engagementEvent = event;
+
+    engagementEvent.sender.send('get-engagement-reply', {
+      engagementPer: 0,
+      currentEngageTime: moment().format('H')
+    });
+    totalIdleTime = 0;
+  });
+
+  /**
    * ioHook listener to get key down event
    */
   ioHook.on('keydown', event => {
     if (isTrack) {
       keyboardCount ++;
+      calcuateIdleTime();
     }
   });
 
@@ -474,6 +666,7 @@ try {
   ioHook.on('mousedown', event => {
     if (isTrack) {
       mouseCount ++;
+      calcuateIdleTime();
     }
   });
 
