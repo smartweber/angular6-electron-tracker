@@ -46,8 +46,8 @@ import { ObjectKeyPipe } from './components/_pipes/object-key.pipe';
 import { AboutComponent } from './components/about/about.component';
 import { HelpComponent } from './components/help/help.component';
 import { CheckComponent } from './components/check/check.component';
-import { SettingComponent } from './components/setting/setting.component';
 import { NoteComponent } from './components/modals/note/note.component';
+import { SettingModalComponent } from './components/modals/setting-modal/setting-modal.component';
 
 
 // AoT requires an exported function for factories
@@ -69,8 +69,8 @@ export function HttpLoaderFactory(http: HttpClient) {
     AboutComponent,
     HelpComponent,
     CheckComponent,
-    SettingComponent,
-    NoteComponent
+    NoteComponent,
+    SettingModalComponent
   ],
   imports: [
     BrowserModule,
@@ -107,7 +107,8 @@ export function HttpLoaderFactory(http: HttpClient) {
     DataService
   ],
   entryComponents: [
-    NoteComponent
+    NoteComponent,
+    SettingModalComponent
   ],
   bootstrap: [AppComponent]
 })

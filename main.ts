@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, ipcMain, Tray, Menu } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, Tray, Menu, shell } from 'electron';
 import * as ioHook from 'iohook';
 import * as path from 'path';
 import * as url from 'url';
@@ -6,11 +6,11 @@ import * as moment from 'moment';
 import { CronJob } from 'cron';
 import { notify } from 'node-notifier';
 let win, serve, size, isTrack, keyboardCount, mouseCount, timerHandlers, settingData;
-let takeScreenshotEvent, createNewActivityEvent, trayControlEvent, tray, engagementEvent, selectProjectEvent;
+let takeScreenshotEvent, createNewActivityEvent, trayControlEvent, tray, engagementEvent, selectProjectEvent, controlEvent;
 let engagementCronjobHandler, trackingCronjobHandler, checkTrackOnHandler;
-let contextMenu, currentTaskId, currentProjectId, selectedTaskId, selectedProjectId, previousTimestamp, focusProjectId;
+let contextMenu, currentTaskId, currentProjectId, selectedTaskId, selectedProjectId, previousTimestamp;
 let idleSettingTime, lastTrackTimestamp, totalIdleTime, lastProjectTime, timeIntervalMins;
-let projectsDetail;
+let projectsDetail, selectedProject;
 lastTrackTimestamp = 0;
 lastProjectTime = 0;
 totalIdleTime = 0;
@@ -23,13 +23,13 @@ currentTaskId = -1;
 currentProjectId = -1;
 selectedTaskId = -1;
 selectedProjectId = -1;
-focusProjectId = -1;
 previousTimestamp = 0;
 timeIntervalMins = 0;
 serve = args.some(val => val === '--serve');
 timerHandlers = [];
 settingData = {};
 projectsDetail = {};
+selectedProject = {};
 
 function createWindow() {
 
@@ -40,15 +40,15 @@ function createWindow() {
   win = new BrowserWindow({
     // x: 0,
     // y: 0,
-    // width: 1280,
-    // height: 720,
-    width: 472,
-    height: 667,
+    width: 1280,
+    height: 720,
+    // width: 472,
+    // height: 667,
     center: true,
     minWidth: 472,
     minHeight: 667,
-    maxWidth: 472,
-    maxHeight: 667,
+    // maxWidth: 472,
+    // maxHeight: 667,
     maximizable: false,
     minimizable: false
     // width: size.width,
@@ -76,8 +76,12 @@ function createWindow() {
   tray = new Tray(iconPath);
   contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Start',
-      click: function() {
+      label: 'Engagement(09:00AM - 10:00AM)',
+      sublabel: '34% 2%'
+    },
+    {
+      label: 'Timer is running',
+      click: () => {
         if (selectedTaskId >= 0 && selectedProjectId >= 0 && trayControlEvent) {
           trayControlEvent.sender.send('tray-icon-control-reply', {
             status: 'start',
@@ -85,11 +89,12 @@ function createWindow() {
             projectId: selectedProjectId
           });
         }
-      }
+      },
+      icon: path.join(__dirname, 'src/assets/images/pause.png')
     },
     {
-      label: 'Stop',
-      click: function() {
+      label: 'Timer is paused',
+      click: () => {
         if (currentTaskId >= 0 && currentProjectId >= 0 && trayControlEvent) {
           trayControlEvent.sender.send('tray-icon-control-reply', {
             status: 'stop',
@@ -97,27 +102,81 @@ function createWindow() {
             projectId: currentProjectId
           });
         }
+      },
+      icon: path.join(__dirname, 'src/assets/images/play.png')
+    },
+    {
+      label: 'Switch Projects',
+      submenu: [
+        {
+          label: 'Project1'
+        },
+        {
+          label: 'Project2'
+        }
+      ]
+    },
+    {
+      label: 'Add a note',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'note'});
       }
     },
-    // {
-    //   label: 'Quit',
-    //   accelerator: 'Command+Q',
-    //   click: function() {
-    //     app.quit();
-    //   }
-    // }
+    {
+      label: 'Open Dashboard',
+      click: () => {
+        shell.openExternal('https://tracklyapp.appup.cloud/trackly/#/430/1587/dashboard');
+      }
+    },
+    {
+      label: 'Settings',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'setting'});
+      }
+    },
+    {
+      label: 'About Track.ly',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'about'});
+      }
+    },
+    {
+      label: 'Help',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'help'});
+      }
+    },
+    {
+      label: 'Check for updates',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'check'});
+      }
+    },
+    {
+      label: 'Sign out',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'signout'});
+      }
+    },
+    {
+      label: 'Quit tracker',
+      click: () => {
+        win = null;
+        app.quit();
+      }
+    }
   ]);
 
   if (contextMenu) {
-    contextMenu.items[0].enabled = false;
     contextMenu.items[1].enabled = false;
+    contextMenu.items[2].enabled = false;
   }
 
   tray.setToolTip('Time Tracker');
   tray.setContextMenu(contextMenu);
   initData();
 
-  // win.webContents.openDevTools();
+  win.webContents.openDevTools();
 
   // Emitted when the window is closed.
   win.on('closed', () => {
@@ -133,6 +192,7 @@ function createWindow() {
 function initData() {
   totalIdleTime = 0;
   projectsDetail = {};
+  customNotify('Test', 'Test');
 }
 
 /**
@@ -287,11 +347,28 @@ function clearData() {
   stopInterval();
 }
 
+/**
+ * check if current weekday is inside target ones
+ * @param weekDayString: weekdays string
+ */
 function checkWeekday(weekDayString) {
   const currentWeekday = moment().isoWeekday();
   const defaultWeekDays = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   const weekDays = weekDayString.trim().toLowerCase().split(',');
   return (weekDays.indexOf(defaultWeekDays[currentWeekday]) > -1);
+}
+
+/**
+ * check if current time is in track on time
+ * @param startTime: start time
+ * @param endTime: end time
+ */
+function checkTrackOnTime(startTime, endTime) {
+  if (moment(new Date()).format('HH:mm:ss') >= startTime && moment(new Date()).format('HH:mm:ss') <= endTime) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -305,7 +382,11 @@ function checkTrackOnStatus() {
 
     const interval = parseInt(settingData['untracked_for_in_min'], 10) * 60 * 1000;
     checkTrackOnHandler = setInterval(() => {
-      if (settingData['notify_me_track_on'] && checkWeekday(settingData['track_on'])) {
+      if (
+        settingData['notify_me_track_on'] &&
+        checkWeekday(settingData['track_on']) &&
+        checkTrackOnTime(settingData['start_time'], settingData['end_time'])
+      ) {
         if (!isTrack) {
           customNotify('Time Tracker', 'Rimnider: You\'re not tracking time.');
         }
@@ -323,25 +404,50 @@ function createTrackingCronJob() {
   if (trackingCronjobHandler) {
     trackingCronjobHandler.stop();
   }
+  console.log('timeIntervalMins: ', timeIntervalMins)
 
   trackingCronjobHandler = new CronJob('0 */' + timeIntervalMins + ' * * * *', () => {
     console.log('tracking cronjob running:');
     // increase timer
-    if (projectsDetail.hasOwnProperty(focusProjectId)) {
+    if (projectsDetail.hasOwnProperty(selectedProject['id'])) {
       const current = Date.now();
       const diffInMiniSecs = current - lastProjectTime;
-      projectsDetail[focusProjectId]['time'] += diffInMiniSecs;
+      projectsDetail[selectedProject['id']]['time'] += diffInMiniSecs;
       lastProjectTime = current;
       selectProjectEvent.sender.send('select-project-reply', {
-        projectId: focusProjectId,
-        during: projectsDetail[focusProjectId]['time']
+        projectId: selectedProject['id'],
+        during: projectsDetail[selectedProject['id']]['time']
       });
+      updateTrayTitle();
     }
 
     if (isTrack) {
       updateTracks(currentProjectId, currentTaskId, Date.now());
     }
   }, null, true);
+}
+
+/**
+ * convert seconds to hh:mm
+ * @param secs: seconds
+ */
+function makeTrayTime(secs) {
+  const hours =  Math.floor(Math.floor(secs / 3600));
+  const minutes = Math.floor(Math.floor((secs - (hours * 3600)) / 60));
+  // const seconds = Math.floor((secs - ((secs * 3600) + (minutes * 60))) % 60);
+
+  const dHours = (hours > 9 ? hours : '0' + hours);
+  const dMins = (minutes > 9 ? minutes : '0' + minutes);
+  return dHours + ':' + dMins;
+}
+
+/**
+ * update tray title
+ */
+function updateTrayTitle() {
+  const timeInMiniSecs = parseInt(projectsDetail[selectedProject['id']]['time'], 10);
+  const projectTimer = makeTrayTime(Math.floor(timeInMiniSecs / 1000));
+  tray.setTitle(`${selectedProject['code']} ${projectTimer}`);
 }
 
 /**
@@ -360,6 +466,7 @@ function destroyListners() {
     ipcMain.removeAllListeners('tray-icon-control');
     ipcMain.removeAllListeners('get-engagement');
     ipcMain.removeAllListeners('select-project');
+    ipcMain.removeAllListeners('control-event');
   }
 
   if (trackingCronjobHandler) {
@@ -483,6 +590,13 @@ try {
   });
 
   /**
+   * ipcMain lisner to get control event
+   */
+  ipcMain.on('control-event', (event, arg) => {
+    controlEvent = event;
+  });
+
+  /**
    * ipcMain lisner to get task id selected
    */
   ipcMain.on('select-task', (event, arg) => {
@@ -495,8 +609,8 @@ try {
       });
 
       if (contextMenu) {
-        contextMenu.items[0].enabled = true;
-        contextMenu.items[1].enabled = false;
+        contextMenu.items[1].enabled = true;
+        contextMenu.items[2].enabled = false;
         tray.setContextMenu(contextMenu);
       }
     }
@@ -518,8 +632,8 @@ try {
       if (currentTaskId !== arg['taskId'] || currentProjectId !== arg['projectId']) {
         isTrack = false;
         if (contextMenu) {
-          contextMenu.items[0].enabled = true;
-          contextMenu.items[1].enabled = false;
+          contextMenu.items[1].enabled = true;
+          contextMenu.items[2].enabled = false;
           tray.setContextMenu(contextMenu);
         }
         const newActivity = createNewActivity(currentProjectId, currentTaskId, Date.now());
@@ -532,8 +646,8 @@ try {
     lastTrackTimestamp = Date.now();
 
     if (contextMenu) {
-      contextMenu.items[0].enabled = false;
-      contextMenu.items[1].enabled = true;
+      contextMenu.items[1].enabled = false;
+      contextMenu.items[2].enabled = true;
       tray.setContextMenu(contextMenu);
     }
 
@@ -560,8 +674,8 @@ try {
     event.sender.send('stop-track-reply', newActivity);
     clearData();
     if (contextMenu) {
-      contextMenu.items[0].enabled = false;
       contextMenu.items[1].enabled = false;
+      contextMenu.items[2].enabled = false;
       tray.setContextMenu(contextMenu);
     }
   });
@@ -577,32 +691,38 @@ try {
   /**
    * ipcMain lisner to select project
    */
-  ipcMain.on('select-project', (event, arg) => {
+  ipcMain.on('select-project', (event, arg) => {console.log('--seelect-project:', arg)
     const current = Date.now();
     selectProjectEvent = event;
+    selectedProject = arg['project'];
 
-    if (arg['project']['id']) { // if project is selected
-      idleSettingTime = arg['project']['ideal_time_interval_mins'] ? parseInt(arg['project']['ideal_time_interval_mins'], 10) : 0;
-      timeIntervalMins = arg['project']['time_interval_mins'] ? parseInt(arg['project']['time_interval_mins'], 10) : 0;
+    if (selectedProject['id']) { // if project is selected
+      idleSettingTime = selectedProject['ideal_time_interval_mins'] ? parseInt(selectedProject['ideal_time_interval_mins'], 10) : 0;
+      timeIntervalMins = selectedProject['time_interval_mins'] ? parseInt(selectedProject['time_interval_mins'], 10) : 0;
       createTrackingCronJob();
       lastProjectTime = current;
-      focusProjectId = arg['project']['id'] ? arg['project']['id'] : -1;
       selectProjectEvent.sender.send('select-project-reply', {
-        projectId: focusProjectId,
-        during: projectsDetail[focusProjectId]['time']
+        projectId: selectedProject['id'],
+        during: projectsDetail[selectedProject['id']]['time']
       });
+
+      updateTrayTitle();
     } else { // if any project is not selected
-      if (focusProjectId > -1) { // if there is previous selected project
-        if (focusProjectId && projectsDetail.hasOwnProperty(focusProjectId)) {
-          const diffInMiniSecs = current - lastProjectTime;
-          projectsDetail[focusProjectId]['time'] += diffInMiniSecs;
-          selectProjectEvent.sender.send('select-project-reply', {
-            projectId: focusProjectId,
-            during: projectsDetail[focusProjectId]['time']
-          });
-          focusProjectId = -1;
-        }
+      if (
+        Object.keys(selectedProject).length !== 0 &&
+        selectedProject['id'] &&
+        projectsDetail.hasOwnProperty(selectedProject['id'])
+      ) { // if there is previous selected project
+        const diffInMiniSecs = current - lastProjectTime;
+        projectsDetail[selectedProject['id']]['time'] += diffInMiniSecs;
+        selectProjectEvent.sender.send('select-project-reply', {
+          projectId: selectedProject['id'],
+          during: projectsDetail[selectedProject['id']]['time']
+        });
       }
+
+      selectedProject = {};
+      tray.setTitle('');
     }
   });
 

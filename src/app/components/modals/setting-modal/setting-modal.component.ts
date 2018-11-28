@@ -1,13 +1,20 @@
-import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
-import { DataService } from '../_services/data.service';
+import {
+  Component,
+  OnInit,
+  Inject
+} from '@angular/core';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogRef
+} from '@angular/material';
+import * as moment from 'moment';
 
 @Component({
-  selector: 'app-setting',
-  templateUrl: './setting.component.html',
-  styleUrls: ['./setting.component.scss']
+  selector: 'app-setting-modal',
+  templateUrl: './setting-modal.component.html',
+  styleUrls: ['./setting-modal.component.scss']
 })
-export class SettingComponent implements OnInit {
+export class SettingModalComponent implements OnInit {
   isLoad: boolean;
   isShowTimer: boolean;
   isNotifyScreenshot: boolean;
@@ -20,8 +27,7 @@ export class SettingComponent implements OnInit {
   tracks: string[];
 
   constructor(
-    private router: Router,
-    private _dataService: DataService
+    public dialgoRef: MatDialogRef<SettingModalComponent>, @Inject(MAT_DIALOG_DATA) public data: any
   ) {
     this.isShowTimer = false;
     this.isLoad = false;
@@ -39,16 +45,13 @@ export class SettingComponent implements OnInit {
     ];
     this.trackInterval = 10;
     this.tracks = [];
-  }
-
-  ngOnInit() {
-    this._dataService.getSetting().then((res) => {
+    data['getDataPromise'].then((res) => {console.log('res: ', res)
       this.isShowTimer = res['show_timer'] ? res['show_timer'] : false;
       this.isNotifyScreenshot = res['notify_me_screenshot'] ? res['notify_me_screenshot'] : false;
       this.isNotifyTrack = res['notify_me_track_on'] ? res['notify_me_track_on'] : false;
       this.trackInterval = res['untracked_for_in_min'] ? res['untracked_for_in_min'] : 0;
-      this.startTime = res['start_time'] ? this.formatToHoursMinutes(res['start_time']) : null;
-      this.endTime = res['end_time'] ? this.formatToHoursMinutes(res['end_time']) : null;
+      this.startTime = res['start_time'] ? moment((res['start_time']), 'HH:mm:ss').format('hh:mm a') : null;
+      this.endTime = res['end_time'] ? moment((res['end_time']), 'HH:mm:ss').format('hh:mm a') : null;
       this.tracks = [];
       if (res['track_on']) {
         const trackOn = res['track_on'].trim();
@@ -65,17 +68,11 @@ export class SettingComponent implements OnInit {
     });
   }
 
-  /**
-   * format to hh:mm
-   * @param time: hh:mm:ss
-   */
-  formatToHoursMinutes(time: string) {
-    const arr = time.split(':');
-    if (arr.length >= 2) {
-      return arr[0] + ':' + arr[1];
-    }
+  ngOnInit() {
+  }
 
-    return null;
+  cancel() {
+    this.dialgoRef.close({status: false});
   }
 
   /**
@@ -87,20 +84,14 @@ export class SettingComponent implements OnInit {
   }
 
   /**
-   * cancel to update
+   * save the setting
    */
-  cancel() {
-    this.router.navigate(['/dashboard']);
-  }
-
-  /**
-   * update the setting
-   */
-  update() {
+  save() {
     if (this.tracks.length === 0) {
       this.errorAlert = 'Track day is required.';
       return;
     }
+
     if (!this.startTime) {
       this.errorAlert = 'Start time is required.';
       return;
@@ -111,7 +102,7 @@ export class SettingComponent implements OnInit {
       return;
     }
 
-    if (this.startTime >= this.endTime) {
+    if (moment(this.startTime, 'hh:mm a') >= moment(this.endTime, 'hh:mm a')) {
       this.errorAlert = 'The start time should be smaller than the end one.';
       return;
     }
@@ -121,15 +112,14 @@ export class SettingComponent implements OnInit {
       notify_me_screenshot: this.isNotifyScreenshot ? 1 : 0,
       notify_me_track_on: this.isNotifyTrack ? 1 : 0,
       track_on: this.tracks.join(','),
-      start_time: this.startTime + ':00',
-      end_time: this.endTime + ':00',
+      start_time: moment(this.startTime, 'hh:mm a').format('HH:mm:ss'),
+      end_time: moment(this.endTime, 'hh:mm a').format('HH:mm:ss'),
       untracked_for_in_min: this.trackInterval ? this.trackInterval : 0
     };
 
-    this._dataService.updateSetting(settingData).then(() => {
-      this.router.navigate(['/dashboard']);
-    }).catch(() => {
-      this.errorAlert = 'Fail to update the setting, please try again later.';
+    this.dialgoRef.close({
+      status: true,
+      data: settingData
     });
   }
 

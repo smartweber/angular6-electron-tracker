@@ -71,8 +71,11 @@ export class LoginComponent implements OnInit {
         this.router.navigate([this.returnUrl]);
       }
     }).catch((err) => {
-      console.log('Login Error: ', err);
-      this.alertService.error('Wrong email or password.');
+      if (err) {
+        this.alertService.error('Wrong email or password.');
+      } else {
+        this.alertService.error('Please try again later.');
+      }
       this.loading = false;
     });
   }

@@ -27,16 +27,7 @@ export class HttpService {
           reject();
         }
       }).catch((err) => {
-        console.log(err);
-        let errorReject = false;
-        if (err.response.status === 401) {
-          this.handleUnAuthetication();
-          errorReject = false;
-        } else {
-          errorReject = true;
-        }
-
-        reject(errorReject);
+        reject(this.errorHandler(err));
       });
     });
   }
@@ -56,16 +47,7 @@ export class HttpService {
           reject();
         }
       }).catch((err) => {
-        console.log(err);
-        let errorReject = false;
-        if (err.response.status === 401) {
-          this.handleUnAuthetication();
-          errorReject = false;
-        } else {
-          errorReject = true;
-        }
-
-        reject(errorReject);
+        reject(this.errorHandler(err));
       });
     });
   }
@@ -94,18 +76,25 @@ export class HttpService {
             reject();
           }
         }).catch((err) => {
-          console.log(err);
-          let errorReject = false;
-          if (err.response.status === 401) {
-            this.handleUnAuthetication();
-            errorReject = false;
-          } else {
-            errorReject = true;
-          }
-
-          reject(errorReject);
+          reject(this.errorHandler(err));
         });
     });
+  }
+
+  /**
+   * error handler
+   * @param error: error
+   */
+  errorHandler(error: any) {
+    console.log(error);
+    let rejectResponse = false;
+    if (!error.response || error.response && error.response.status === 401) {
+      this.handleUnAuthetication();
+      rejectResponse = false;
+    } else {
+      rejectResponse = true;
+    }
+    return rejectResponse;
   }
 
   /**

@@ -24,7 +24,7 @@
   <!-- Project detail end -->
 
   <!-- Menu start -->
-  <mat-menu #main_menu="matMenu">
+  <mat-menu #main_menu="matMenu" xPosition="before">
     <!-- Engagement start-->
     <button class="engagement-container" mat-menu-item *ngIf="isEngagement">
       <div class="engagement-wrapper p-2">
@@ -81,8 +81,8 @@
 
     <button mat-menu-item [matMenuTriggerFor]="switch_projects" *ngIf="isProjectMenu">Switch Projects</button>
     <button mat-menu-item (click)="addNote()" [disabled]="!isAddNote">Add a note</button>
-    <a class="none-underline" mat-menu-item [routerLink]="['/dashboard']">Open Dashboard</a>
-    <a class="none-underline" mat-menu-item [routerLink]="['/setting']">Settings</a>
+    <a class="none-underline" mat-menu-item (click)="goToAppDashboard($event)">Open Dashboard</a>
+    <a class="none-underline" mat-menu-item (click)="openSettings($event)">Settings</a>
     <a class="none-underline" mat-menu-item [routerLink]="['/about']">About Track.ly</a>
     <a class="none-underline" mat-menu-item [routerLink]="['/help']">Help</a>
     <a class="none-underline" mat-menu-item [routerLink]="['/check']">Check for updates</a>

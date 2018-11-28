@@ -7,7 +7,6 @@ import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { AboutComponent } from './components/about/about.component';
 import { HelpComponent } from './components/help/help.component';
 import { CheckComponent } from './components/check/check.component';
-import { SettingComponent } from './components/setting/setting.component';
 
 const appRoutes: Routes = [
     { path: 'task/:id', component: TaskComponent, canActivate: [AuthGuard] },
@@ -16,7 +15,6 @@ const appRoutes: Routes = [
     { path: 'about', component: AboutComponent },
     { path: 'help', component: HelpComponent },
     { path: 'check', component: CheckComponent },
-    { path: 'setting', component: SettingComponent },
 
     // otherwise redirect to home
     { path: '**', redirectTo: '/dashboard' }

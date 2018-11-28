@@ -2,6 +2,11 @@ import { Injectable } from '@angular/core';
 import { HttpService } from './http.service';
 import { Subject, Observable } from 'rxjs';
 import { ElectronService } from '../../providers/electron.service';
+import { MatDialog } from '@angular/material';
+import { NoteComponent } from '../modals/note/note.component';
+import { SettingModalComponent } from '../modals/setting-modal/setting-modal.component';
+import { Router } from '@angular/router';
+import { AlertService } from './alert.service';
 
 @Injectable()
 export class DataService {
@@ -36,7 +41,10 @@ export class DataService {
 
   constructor(
     private _electronService: ElectronService,
-    private _httpService: HttpService
+    private _httpService: HttpService,
+    private dialog: MatDialog,
+    private _router: Router,
+    private _alertService: AlertService
   ) {
     this.screenshotUrls = [];
     this.tasks = [];
@@ -224,6 +232,76 @@ export class DataService {
           time: this.projectTime
         });
       });
+
+      /**
+       * control event
+       */
+      this._electronService.ipcRenderer.send('control-event');
+      this._electronService.ipcRenderer.on('control-event-reply', (event, arg) => {
+        console.log('control-event-reply: ', arg);
+        let config;
+        switch (arg['type']) {
+          case 'note':
+            config = {
+              width: '400px',
+              disableClose: true
+            };
+            const noteDialogRef = this.dialog.open(NoteComponent, config);
+            noteDialogRef.afterClosed().subscribe(result => {
+              if (result['status']) {
+                this.addNote(result['note']).then(() => {
+                }).catch((error) => {
+                  console.log(error)
+                  if (error) {
+                    this._alertService.error('Please try again later.');
+                  } else {
+                    this._alertService.error('Empty activity.');
+                  }
+                });
+              }
+            });
+            break;
+
+          case 'setting':
+            config = {
+              width: '400px',
+              disableClose: true,
+              data: {
+                getDataPromise: this.getSetting()
+              }
+            };
+            const settingDialogRef = this.dialog.open(SettingModalComponent, config);
+            settingDialogRef.afterClosed().subscribe(result => {
+              if (result['status']) {
+                this.updateSetting(result['data']).then(() => {
+                }).catch(() => {
+                  this._alertService.error('Please try again later.');
+                });
+              }
+            });
+            break;
+
+          case 'about':
+            this._router.navigate(['/about']);
+            break;
+          case 'help':
+          this._router.navigate(['/help']);
+            break;
+          case 'check':
+          this._router.navigate(['/check']);
+            break;
+          case 'signout':
+            localStorage.removeItem('userInformation');
+            if (this.isTracking) {
+              this.stopTrack();
+            }
+            this._router.navigate(['/login']);
+            break;
+
+          default:
+            break;
+        }
+      });
     }
   }
 
@@ -282,6 +360,10 @@ export class DataService {
         } else {
           this.projectSettings = [];
         }
+
+        this.projectsSubject.next({
+          projects: this.projectSettings
+        });
 
         this._electronService.ipcRenderer.send('get-all-projects', {
           projects: this.projectSettings
@@ -687,7 +769,7 @@ export class DataService {
         this.getSetting();
         resolve();
       }).catch((error) => {
-        reject();
+        reject(error);
       });
     });
   }

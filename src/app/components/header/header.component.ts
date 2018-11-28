@@ -5,6 +5,7 @@ import { DataService } from '../_services/data.service';
 import { ElectronService } from '../../providers/electron.service';
 import { MatDialog } from '@angular/material';
 import { NoteComponent } from '../modals/note/note.component';
+import { SettingModalComponent } from '../modals/setting-modal/setting-modal.component';
 
 
 @Component({
@@ -272,6 +273,23 @@ export class HeaderComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * open settings modal
+   * @param event: event
+   */
+  openSettings(event: any) {
+    event.preventDefault();
+    const config = {
+      width: '400px',
+      disableClose: true
+    };
+    const dialogRef = this.dialog.open(SettingModalComponent, config);
+
+    dialogRef.afterClosed().subscribe(result => {
+      console.log(result);
+    });
+  }
+
+  /**
    * timer handler
    */
   timerHandler() {
@@ -291,6 +309,17 @@ export class HeaderComponent implements OnInit, OnDestroy {
           });
         }
       }
+    }
+  }
+
+  /**
+   * go to dashboard
+   * @param event: event
+   */
+  goToAppDashboard(event: any) {
+    event.preventDefault();
+    if (this._electronService.isElectron) {
+      this._electronService.shell.openExternal('https://tracklyapp.appup.cloud/trackly/#/430/1587/dashboard');
     }
   }
 
