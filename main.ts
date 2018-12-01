@@ -6,30 +6,37 @@ import * as moment from 'moment';
 import { CronJob } from 'cron';
 import { notify } from 'node-notifier';
 let win, serve, size, isTrack, keyboardCount, mouseCount, timerHandlers, settingData;
-let takeScreenshotEvent, createNewActivityEvent, trayControlEvent, tray, engagementEvent, selectProjectEvent, controlEvent;
-let engagementCronjobHandler, trackingCronjobHandler, checkTrackOnHandler;
+let takeScreenshotEvent, createNewActivityEvent, trayControlEvent, tray, selectProjectEvent, controlEvent;
+let hourCronjobHandler, trackingIntervalHandler, engagementIntervalHandler, checkTrackOnHandler;
 let contextMenu, currentTaskId, currentProjectId, selectedTaskId, selectedProjectId, previousTimestamp;
-let idleSettingTime, lastTrackTimestamp, totalIdleTime, lastProjectTime, timeIntervalMins;
-let projectsDetail, selectedProject;
+let idleSettingTimeInMins, lastTrackTimestamp, idleTimeInMilliSecs, lastProjectTimestamp, lastEngagementPer;
+let projectsDetail, selectedProject, menuTemplate;
+let trackingTimeIntervalMins, engagementTimeIntervalMins;
 lastTrackTimestamp = 0;
-lastProjectTime = 0;
-totalIdleTime = 0;
-const spanSeconds = 60;
-const args = process.argv.slice(1);
-isTrack = false;
+lastProjectTimestamp = 0;
+idleTimeInMilliSecs = 0;
 keyboardCount = 0;
 mouseCount = 0;
+lastEngagementPer = 0;
 currentTaskId = -1;
 currentProjectId = -1;
 selectedTaskId = -1;
 selectedProjectId = -1;
 previousTimestamp = 0;
-timeIntervalMins = 0;
-serve = args.some(val => val === '--serve');
-timerHandlers = [];
+trackingTimeIntervalMins = 0;
+engagementTimeIntervalMins = 0;
+
+isTrack = false;
+
 settingData = {};
 projectsDetail = {};
 selectedProject = {};
+menuTemplate = [];
+timerHandlers = [];
+
+const args = process.argv.slice(1);
+serve = args.some(val => val === '--serve');
+
 
 function createWindow() {
 
@@ -40,15 +47,15 @@ function createWindow() {
   win = new BrowserWindow({
     // x: 0,
     // y: 0,
-    width: 1280,
-    height: 720,
-    // width: 472,
-    // height: 667,
+    // width: 1280,
+    // height: 720,
+    width: 472,
+    height: 667,
     center: true,
     minWidth: 472,
     minHeight: 667,
-    // maxWidth: 472,
-    // maxHeight: 667,
+    maxWidth: 472,
+    maxHeight: 667,
     maximizable: false,
     minimizable: false
     // width: size.width,
@@ -68,115 +75,10 @@ function createWindow() {
     }));
   }
 
-  /**
-   * Set tray icon
-   */
-  const iconPath = path.join(__dirname, 'tray.png');
-
-  tray = new Tray(iconPath);
-  contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Engagement(09:00AM - 10:00AM)',
-      sublabel: '34% 2%'
-    },
-    {
-      label: 'Timer is running',
-      click: () => {
-        if (selectedTaskId >= 0 && selectedProjectId >= 0 && trayControlEvent) {
-          trayControlEvent.sender.send('tray-icon-control-reply', {
-            status: 'start',
-            taskId: selectedTaskId,
-            projectId: selectedProjectId
-          });
-        }
-      },
-      icon: path.join(__dirname, 'src/assets/images/pause.png')
-    },
-    {
-      label: 'Timer is paused',
-      click: () => {
-        if (currentTaskId >= 0 && currentProjectId >= 0 && trayControlEvent) {
-          trayControlEvent.sender.send('tray-icon-control-reply', {
-            status: 'stop',
-            taskId: currentTaskId,
-            projectId: currentProjectId
-          });
-        }
-      },
-      icon: path.join(__dirname, 'src/assets/images/play.png')
-    },
-    {
-      label: 'Switch Projects',
-      submenu: [
-        {
-          label: 'Project1'
-        },
-        {
-          label: 'Project2'
-        }
-      ]
-    },
-    {
-      label: 'Add a note',
-      click: () => {
-        controlEvent.sender.send('control-event-reply', {type: 'note'});
-      }
-    },
-    {
-      label: 'Open Dashboard',
-      click: () => {
-        shell.openExternal('https://tracklyapp.appup.cloud/trackly/#/430/1587/dashboard');
-      }
-    },
-    {
-      label: 'Settings',
-      click: () => {
-        controlEvent.sender.send('control-event-reply', {type: 'setting'});
-      }
-    },
-    {
-      label: 'About Track.ly',
-      click: () => {
-        controlEvent.sender.send('control-event-reply', {type: 'about'});
-      }
-    },
-    {
-      label: 'Help',
-      click: () => {
-        controlEvent.sender.send('control-event-reply', {type: 'help'});
-      }
-    },
-    {
-      label: 'Check for updates',
-      click: () => {
-        controlEvent.sender.send('control-event-reply', {type: 'check'});
-      }
-    },
-    {
-      label: 'Sign out',
-      click: () => {
-        controlEvent.sender.send('control-event-reply', {type: 'signout'});
-      }
-    },
-    {
-      label: 'Quit tracker',
-      click: () => {
-        win = null;
-        app.quit();
-      }
-    }
-  ]);
-
-  if (contextMenu) {
-    contextMenu.items[1].enabled = false;
-    contextMenu.items[2].enabled = false;
-  }
-
-  tray.setToolTip('Time Tracker');
-  tray.setContextMenu(contextMenu);
+  createTrayMenu();
   initData();
 
-  win.webContents.openDevTools();
+  // win.webContents.openDevTools();
 
   // Emitted when the window is closed.
   win.on('closed', () => {
@@ -189,32 +91,13 @@ function createWindow() {
 
 }
 
+/**
+ * init data
+ */
 function initData() {
-  totalIdleTime = 0;
+  idleTimeInMilliSecs = 0;
   projectsDetail = {};
-  customNotify('Test', 'Test');
-}
-
-/**
- * calculate idle time
- */
-function calcuateIdleTime() {
-  if (lastTrackTimestamp !== 0) {
-    const diffInMin = Math.abs(lastTrackTimestamp - Date.now());
-    if (diffInMin > idleSettingTime * 60 * 1000) { // idle setting time is as a minute format
-      totalIdleTime += diffInMin;
-    }
-  }
-
-  lastTrackTimestamp = Date.now();
-}
-
-/**
- * calculate engagement percentage
- */
-function calculateEngagementPer() {
-  const hourInSeconds = 60 * 60 * 1000;
-  return Math.abs((hourInSeconds - totalIdleTime) / hourInSeconds * 100);
+  // customNotify('Test', 'Test');
 }
 
 /**
@@ -231,39 +114,24 @@ function customNotify(title, message) {
 }
 
 /**
- * format date from standard Date type
- * @param date : Date type
- */
-function formatDate(date) {
-  let hours = date.getHours();
-  let minutes = date.getMinutes();
-  let seconds = date.getSeconds();
-  hours = hours < 10 ? '0' + hours : hours;
-  minutes = minutes < 10 ? '0' + minutes : minutes;
-  seconds = seconds < 10 ? '0' + seconds : seconds;
-  const strTime = hours + ':' + minutes + ':' + seconds;
-  const years = date.getFullYear();
-  const months = date.getMonth() + 1;
-  const dates = date.getDate();
-  return years + '-' + months + '-' + dates + ' ' + strTime;
-}
-
-/**
  * update track
  * @param projectId: project id
  * @param taskId: task id
  * @param timestamp: timestamp
- * @param isImmediate: immediate process flag
+ * @param isScreenshot: taking screenshot flag
  */
-function updateTracks(projectId, taskId, timestamp, isImmediate = false) {
-  takeScreenShots(taskId, spanSeconds * 1000, isImmediate);
+function updateTracks(projectId, taskId, timestamp, isScreenshot = true) {
+  if (isScreenshot) {
+    takeScreenShots(taskId, trackingTimeIntervalMins * 60 * 1000, false);
+  }
+
   const newActivity = createNewActivity(projectId, taskId, timestamp);
+  createNewActivityEvent.sender.send('create-new-activity-reply', newActivity);
   console.log('---create activity---');
   console.log(newActivity);
   if (settingData['notify_me_screenshot']) {
     customNotify('Time Tracker', 'Screenshot taken');
   }
-  createNewActivityEvent.sender.send('create-new-activity-reply', newActivity);
 }
 
 /**
@@ -275,19 +143,22 @@ function updateTracks(projectId, taskId, timestamp, isImmediate = false) {
 function createNewActivity(projectId, taskId, timestamp) {
   let duration = Math.floor((timestamp - previousTimestamp) / 1000);
 
-  if (duration > 57) {
-    duration = spanSeconds;
+  if (duration > (trackingTimeIntervalMins * 60 - 3)) {
+    duration = trackingTimeIntervalMins;
   }
 
+  const status = (idleTimeInMilliSecs >= idleSettingTimeInMins * 60 * 1000) ? 'idle' : 'engaged';
+
   const newActivity = {
+    status: status,
     project_id: projectId,
-    task_id: taskId,
+    task_id: taskId < 0 ? null : taskId,
     duration: duration,
-    mode: 'MANUAL',
+    mode: 'AUTOMATIC',
     reason: 'task interval screenshot detail done',
-    date: formatDate(new Date(timestamp)),
-    from_time: formatDate(new Date(previousTimestamp)),
-    to_time: formatDate(new Date(timestamp)),
+    date: moment(new Date(timestamp)).format('YYYY-MM-DD HH:mm:ss'),
+    from_time: moment(new Date(previousTimestamp)).format('YYYY-MM-DD HH:mm:ss'),
+    to_time: moment(new Date(timestamp)).format('YYYY-MM-DD HH:mm:ss'),
     screenshot_urls: [],
     mouse_click_count: mouseCount,
     keyboard_count: keyboardCount
@@ -301,12 +172,12 @@ function createNewActivity(projectId, taskId, timestamp) {
 
 /**
  * take screenshots of desktop from UI
- * @param during: interval between activities
+ * @param during: interval between activities in mini-second
  * @param isImmediate: immediate proecss flag
  */
 function takeScreenShots(taskId, during, isImmediate = false) {
   if (isImmediate) {
-    timerHandlers[0] = takeScreenshotEvent.sender.send('take-screenshot-reply', taskId);
+    takeScreenshotEvent.sender.send('take-screenshot-reply', taskId);
     return;
   }
 
@@ -322,9 +193,9 @@ function takeScreenShots(taskId, during, isImmediate = false) {
 }
 
 /**
- * stop interval
+ * clear screenshots intervals
  */
-function stopInterval() {
+function clearScreenshotsIntervals() {
   for (let index = 0; index < 3; index ++) {
     if (timerHandlers[index]) {
       clearInterval(timerHandlers[index]);
@@ -333,18 +204,17 @@ function stopInterval() {
 }
 
 /**
- * clear local data
+ * clear tracking data
  */
-function clearData() {
+function clearTrackData() {
   isTrack = false;
   mouseCount = 0;
   keyboardCount = 0;
   previousTimestamp = 0;
   currentTaskId = -1;
   currentProjectId = -1;
-  selectedProjectId = -1;
   selectedTaskId = -1;
-  stopInterval();
+  clearScreenshotsIntervals();
 }
 
 /**
@@ -395,36 +265,78 @@ function checkTrackOnStatus() {
   }
 }
 
-function createTrackingCronJob() {
-  if (timeIntervalMins >= 60) {
-    console.log('Tracking interval is greater than 60');
+/**
+ * calculate idle time
+ */
+function calcuateIdleTime() {
+  if (lastTrackTimestamp !== 0) {
+    const diffInMilliSecs = Math.abs(lastTrackTimestamp - Date.now());
+    if (diffInMilliSecs >= idleSettingTimeInMins * 60 * 1000) { // idle setting time in a minute format
+      idleTimeInMilliSecs += diffInMilliSecs;
+    }
+  }
+
+  lastTrackTimestamp = Date.now();
+}
+
+/**
+ * calculate engagement percentage
+ */
+function calculateEngagementPer() {
+  const hourInMilliSeconds = 60 * 60 * 1000;
+  return Math.abs((hourInMilliSeconds - idleTimeInMilliSecs) / hourInMilliSeconds * 100);
+}
+
+/**
+ * create time intervals
+ */
+function createTimeIntervals() {
+  // tracking cron job
+  if (trackingTimeIntervalMins <= 0) {
+    console.log('Tracking interval is less than 0');
     return;
   }
 
-  if (trackingCronjobHandler) {
-    trackingCronjobHandler.stop();
+  if (trackingIntervalHandler) {
+    clearInterval(trackingIntervalHandler);
   }
-  console.log('timeIntervalMins: ', timeIntervalMins)
 
-  trackingCronjobHandler = new CronJob('0 */' + timeIntervalMins + ' * * * *', () => {
-    console.log('tracking cronjob running:');
+  const trackingIntervalInMiniSecs = parseInt(trackingTimeIntervalMins, 10) * 60 * 1000;
+  console.log('trackingTimeIntervalMins: ', trackingTimeIntervalMins, trackingIntervalInMiniSecs);
+
+  trackingIntervalHandler = setInterval(() => {
+    console.log('tracking interval running:');
     // increase timer
-    if (projectsDetail.hasOwnProperty(selectedProject['id'])) {
+    if (projectsDetail.hasOwnProperty(selectedProjectId)) {
       const current = Date.now();
-      const diffInMiniSecs = current - lastProjectTime;
-      projectsDetail[selectedProject['id']]['time'] += diffInMiniSecs;
-      lastProjectTime = current;
-      selectProjectEvent.sender.send('select-project-reply', {
-        projectId: selectedProject['id'],
-        during: projectsDetail[selectedProject['id']]['time']
-      });
+      const diffInMilliSecs = current - lastProjectTimestamp;
+      projectsDetail[selectedProjectId]['time'] += diffInMilliSecs;
+      lastProjectTimestamp = current;
       updateTrayTitle();
     }
 
     if (isTrack) {
       updateTracks(currentProjectId, currentTaskId, Date.now());
     }
-  }, null, true);
+  }, trackingIntervalInMiniSecs);
+
+  // engagement cron job
+  if (engagementTimeIntervalMins <= 0) {
+    console.log('Tracking interval is less than 0');
+    return;
+  }
+
+  if (engagementIntervalHandler) {
+    clearInterval(engagementIntervalHandler);
+  }
+
+  const egIntervalInMiniSecs = parseInt(engagementTimeIntervalMins, 10) * 60 * 1000;
+  console.log('engagementTimeIntervalMins: ', engagementTimeIntervalMins, egIntervalInMiniSecs);
+
+  engagementIntervalHandler = setInterval(() => {
+    console.log('engagement interval running:');
+    calcuateIdleTime();
+  }, egIntervalInMiniSecs);
 }
 
 /**
@@ -445,9 +357,161 @@ function makeTrayTime(secs) {
  * update tray title
  */
 function updateTrayTitle() {
-  const timeInMiniSecs = parseInt(projectsDetail[selectedProject['id']]['time'], 10);
-  const projectTimer = makeTrayTime(Math.floor(timeInMiniSecs / 1000));
-  tray.setTitle(`${selectedProject['code']} ${projectTimer}`);
+  if (projectsDetail && selectedProjectId && projectsDetail[selectedProjectId]) {
+    const timeInMiniSecs = parseInt(projectsDetail[selectedProjectId]['time'], 10);
+    const projectTimer = makeTrayTime(Math.floor(timeInMiniSecs / 1000));
+    if (tray) {
+      tray.setTitle(`${selectedProject['code']} ${projectTimer}`);
+    }
+  } else {
+    if (tray) {
+      tray.setTitle('');
+    }
+  }
+}
+
+/**
+ * update engagement
+ * @param engagementPer: engagement percentage?
+ */
+function updateEngagement(engagementPer) {
+  const endHour = moment().format('hh a');
+  const startHour = moment().subtract(1, 'hours').format('hh a');
+  return `Engagement(${startHour} - ${endHour}) ${engagementPer}% ${engagementPer - lastEngagementPer}%`;
+}
+
+/**
+ * create tray menu
+ */
+function createTrayMenu() {
+  /**
+   * Set tray icon
+   */
+  const iconPath = path.join(__dirname, 'tray.png');
+
+  tray = new Tray(iconPath);
+  menuTemplate = [
+    {
+      label: updateEngagement(0)
+    },
+    {
+      label: 'Timer is running',
+      click: () => {
+        if (currentProjectId >= 0 && trayControlEvent) {
+          trayControlEvent.sender.send('tray-icon-control-reply', {
+            status: 'stop',
+            taskId: currentTaskId,
+            projectId: currentProjectId
+          });
+        }
+      },
+      icon: path.join(__dirname, 'pause.png'),
+      visible: false
+    },
+    {
+      label: 'Timer is paused',
+      click: () => {
+        if (selectedProjectId >= 0 && trayControlEvent) {
+          trayControlEvent.sender.send('tray-icon-control-reply', {
+            status: 'start',
+            taskId: selectedTaskId,
+            projectId: selectedProjectId
+          });
+        }
+      },
+      icon: path.join(__dirname, 'play.png'),
+      enabled: false
+    },
+    {
+      label: 'Switch Projects'
+    },
+    {
+      label: 'Add a note',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'note'});
+      },
+      enabled: false
+    },
+    {
+      label: 'Open Dashboard',
+      click: () => {
+        shell.openExternal('https://tracklyapp.appup.cloud/trackly/#/430/1587/dashboard');
+      }
+    },
+    {
+      label: 'Settings',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'setting'});
+      }
+    },
+    {
+      label: 'About Track.ly',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'about'});
+      }
+    },
+    {
+      label: 'Help',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'help'});
+      }
+    },
+    {
+      label: 'Check for updates',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'check'});
+      }
+    },
+    {
+      label: 'Sign out',
+      click: () => {
+        controlEvent.sender.send('control-event-reply', {type: 'signout'});
+      }
+    },
+    {
+      label: 'Quit tracker',
+      click: () => {
+        if (win) {
+          win = null;
+        }
+
+        app.quit();
+      }
+    }
+  ];
+
+  contextMenu = Menu.buildFromTemplate(menuTemplate);
+  tray.setContextMenu(contextMenu);
+  tray.setToolTip('Time Tracker');
+  tray.setTitle('');
+}
+
+/**
+ * build project tray menu
+ * @param projects: projects
+ * @param tasks: tasks
+ */
+function buildProjectMenu(projects, tasks) {
+  let projectSubMenu = [];
+  if (projects.length > 0) {
+    projectSubMenu = projects.map((project) => {
+      const projectTasks = [];
+      for (let index = 0; index < tasks.length; index ++) {
+        if (parseInt(tasks[index]['project_id'], 10) === parseInt(project['id'], 10)) {
+          projectTasks.push({
+            id: project['id'] + '-' + tasks[index]['id'],
+            label: tasks[index]['description']
+          });
+        }
+      }
+      return {
+        id: project['id'],
+        label: project['name'],
+        submenu: projectTasks
+      };
+    });
+  }
+  return projectSubMenu;
 }
 
 /**
@@ -464,21 +528,24 @@ function destroyListners() {
     ipcMain.removeAllListeners('stop-track');
     ipcMain.removeAllListeners('create-new-activity');
     ipcMain.removeAllListeners('tray-icon-control');
-    ipcMain.removeAllListeners('get-engagement');
     ipcMain.removeAllListeners('select-project');
     ipcMain.removeAllListeners('control-event');
   }
 
-  if (trackingCronjobHandler) {
-    trackingCronjobHandler.stop();
+  if (trackingIntervalHandler) {
+    clearInterval(trackingIntervalHandler);
   }
 
-  if (engagementCronjobHandler) {
-    engagementCronjobHandler.stop();
+  if (engagementIntervalHandler) {
+    clearInterval(engagementIntervalHandler);
   }
 
   if (checkTrackOnHandler) {
     clearInterval(checkTrackOnHandler);
+  }
+
+  if (hourCronjobHandler) {
+    hourCronjobHandler.stop();
   }
 }
 
@@ -531,15 +598,17 @@ try {
   /**
    * Cron Job for Engagement
    */
-  engagementCronjobHandler = new CronJob('0 0 */1 * * *', () => {
-    console.log('engagement cronjob running:');
-    const engagementPer = calculateEngagementPer();
+  hourCronjobHandler = new CronJob('0 0 */1 * * *', () => {
 
-    engagementEvent.sender.send('get-engagement-reply', {
-      engagementPer: engagementPer,
-      currentEngageTime: moment().format('H')
-    });
-    totalIdleTime = 0;
+    if (contextMenu && menuTemplate.length > 0) {
+      console.log('engagement cronjob running:');
+      const engagementPer = calculateEngagementPer();
+      menuTemplate[0].label = updateEngagement(engagementPer);
+      contextMenu = Menu.buildFromTemplate(menuTemplate);
+      tray.setContextMenu(contextMenu);
+      lastEngagementPer = engagementPer;
+      idleTimeInMilliSecs = 0;
+    }
 
     // check the reset time
     const currentTime = new Date();
@@ -608,9 +677,11 @@ try {
         selectedProjectId: selectedProjectId
       });
 
-      if (contextMenu) {
-        contextMenu.items[1].enabled = true;
-        contextMenu.items[2].enabled = false;
+      if (tray && menuTemplate.length > 0) {
+        menuTemplate[1].visible = false;
+        menuTemplate[2].visible = true;
+        menuTemplate[2].enabled = true;
+        contextMenu = Menu.buildFromTemplate(menuTemplate);
         tray.setContextMenu(contextMenu);
       }
     }
@@ -631,23 +702,25 @@ try {
     if (currentTaskId >= 0 && currentProjectId >= 0) {
       if (currentTaskId !== arg['taskId'] || currentProjectId !== arg['projectId']) {
         isTrack = false;
-        if (contextMenu) {
-          contextMenu.items[1].enabled = true;
-          contextMenu.items[2].enabled = false;
+        if (tray && menuTemplate.length > 0) {
+          menuTemplate[1].visible = false;
+          menuTemplate[2].visible = true;
+          menuTemplate[2].enabled = true;
+          contextMenu = Menu.buildFromTemplate(menuTemplate);
           tray.setContextMenu(contextMenu);
         }
-        const newActivity = createNewActivity(currentProjectId, currentTaskId, Date.now());
-        event.sender.send('stop-track-reply', newActivity);
-        clearData();
+        updateTracks(currentProjectId, currentTaskId, Date.now(), false);
+        clearTrackData();
       }
     }
 
     isTrack = true;
     lastTrackTimestamp = Date.now();
 
-    if (contextMenu) {
-      contextMenu.items[1].enabled = false;
-      contextMenu.items[2].enabled = true;
+    if (tray && menuTemplate.length) {
+      menuTemplate[1].visible = true;
+      menuTemplate[2].visible = false;
+      contextMenu = Menu.buildFromTemplate(menuTemplate);
       tray.setContextMenu(contextMenu);
     }
 
@@ -656,7 +729,7 @@ try {
     currentProjectId = arg['projectId'];
     selectedProjectId = arg['projectId'];
     previousTimestamp = Date.now();
-    takeScreenShots(currentTaskId, spanSeconds * 1000, true);
+    takeScreenShots(currentTaskId, trackingTimeIntervalMins * 60 * 1000, true);
     event.sender.send('start-track-reply', {
       currentTaskId: currentTaskId,
       currentProjectId: currentProjectId,
@@ -670,12 +743,13 @@ try {
    */
   ipcMain.on('stop-track', (event, arg) => {
     isTrack = false;
-    const newActivity = createNewActivity(arg['projectId'], arg['taskId'], Date.now());
-    event.sender.send('stop-track-reply', newActivity);
-    clearData();
-    if (contextMenu) {
-      contextMenu.items[1].enabled = false;
-      contextMenu.items[2].enabled = false;
+    updateTracks(arg['projectId'], arg['taskId'], Date.now(), false);
+    clearTrackData();
+    if (tray && menuTemplate.length > 0) {
+      menuTemplate[1].visible = false;
+      menuTemplate[2].visible = true;
+      menuTemplate[2].enabled = true;
+      contextMenu = Menu.buildFromTemplate(menuTemplate);
       tray.setContextMenu(contextMenu);
     }
   });
@@ -691,21 +765,26 @@ try {
   /**
    * ipcMain lisner to select project
    */
-  ipcMain.on('select-project', (event, arg) => {console.log('--seelect-project:', arg)
+  ipcMain.on('select-project', (event, arg) => {
     const current = Date.now();
     selectProjectEvent = event;
     selectedProject = arg['project'];
 
     if (selectedProject['id']) { // if project is selected
-      idleSettingTime = selectedProject['ideal_time_interval_mins'] ? parseInt(selectedProject['ideal_time_interval_mins'], 10) : 0;
-      timeIntervalMins = selectedProject['time_interval_mins'] ? parseInt(selectedProject['time_interval_mins'], 10) : 0;
-      createTrackingCronJob();
-      lastProjectTime = current;
-      selectProjectEvent.sender.send('select-project-reply', {
-        projectId: selectedProject['id'],
-        during: projectsDetail[selectedProject['id']]['time']
-      });
-
+      selectedProjectId = selectedProject['id'];
+      idleSettingTimeInMins = selectedProject['ideal_time_interval_mins'] ? parseInt(selectedProject['ideal_time_interval_mins'], 10) : 0;
+      trackingTimeIntervalMins = selectedProject['time_interval_mins'] ? parseInt(selectedProject['time_interval_mins'], 10) : 0;
+      engagementTimeIntervalMins = selectedProject['engagement_interval_mins'] ?
+        parseInt(selectedProject['engagement_interval_mins'], 10) : 0;
+      createTimeIntervals();
+      lastProjectTimestamp = current;
+      if (tray && menuTemplate.length > 0) {
+        menuTemplate[1].visible = false;
+        menuTemplate[2].visible = true;
+        menuTemplate[2].enabled = true;
+        contextMenu = Menu.buildFromTemplate(menuTemplate);
+        tray.setContextMenu(contextMenu);
+      }
       updateTrayTitle();
     } else { // if any project is not selected
       if (
@@ -713,23 +792,29 @@ try {
         selectedProject['id'] &&
         projectsDetail.hasOwnProperty(selectedProject['id'])
       ) { // if there is previous selected project
-        const diffInMiniSecs = current - lastProjectTime;
-        projectsDetail[selectedProject['id']]['time'] += diffInMiniSecs;
-        selectProjectEvent.sender.send('select-project-reply', {
-          projectId: selectedProject['id'],
-          during: projectsDetail[selectedProject['id']]['time']
-        });
+        const diffInMilliSecs = current - lastProjectTimestamp;
+        projectsDetail[selectedProject['id']]['time'] += diffInMilliSecs;
       }
 
       selectedProject = {};
-      tray.setTitle('');
+      selectedProjectId = -1;
+      if (tray) {
+        if (tray && menuTemplate.length > 0 && !isTrack) {
+          menuTemplate[1].visible = false;
+          menuTemplate[2].visible = true;
+          menuTemplate[2].enabled = false;
+          contextMenu = Menu.buildFromTemplate(menuTemplate);
+          tray.setContextMenu(contextMenu);
+        }
+        tray.setTitle('');
+      }
     }
   });
 
   /**
-   * ipcMain lisner to get all projects
+   * ipcMain lisner to get all projects and tasks
    */
-  ipcMain.on('get-all-projects', (event, arg) => {
+  ipcMain.on('get-all-projects-tasks', (event, arg) => {
     if (arg['projects'] && arg['projects'].length > 0) {
       for (let index = 0; index < arg['projects'].length; index ++) {
         if (arg['projects'][index] && arg['projects'][index]['id']) {
@@ -740,6 +825,24 @@ try {
           }
         }
       }
+
+      const projectSubMenu = buildProjectMenu(arg['projects'], arg['tasks']);
+      if (tray && menuTemplate.length > 3) {
+        menuTemplate[3].submenu = projectSubMenu;
+        contextMenu = Menu.buildFromTemplate(menuTemplate);
+        tray.setContextMenu(contextMenu);
+      }
+    }
+  });
+
+  /**
+   * ipcMain activity lisner
+   */
+  ipcMain.on('activity-notification', (event, arg) => {
+    if (tray && menuTemplate.length > 0) {
+      menuTemplate[4].enabled = true;
+      contextMenu = Menu.buildFromTemplate(menuTemplate);
+      tray.setContextMenu(contextMenu);
     }
   });
 
@@ -758,25 +861,12 @@ try {
   });
 
   /**
-   * ipcMain lisner to get event of engagement
-   */
-  ipcMain.on('get-engagement', (event, arg) => {
-    engagementEvent = event;
-
-    engagementEvent.sender.send('get-engagement-reply', {
-      engagementPer: 0,
-      currentEngageTime: moment().format('H')
-    });
-    totalIdleTime = 0;
-  });
-
-  /**
    * ioHook listener to get key down event
    */
   ioHook.on('keydown', event => {
     if (isTrack) {
       keyboardCount ++;
-      calcuateIdleTime();
+      lastTrackTimestamp = Date.now();
     }
   });
 
@@ -786,7 +876,7 @@ try {
   ioHook.on('mousedown', event => {
     if (isTrack) {
       mouseCount ++;
-      calcuateIdleTime();
+      lastTrackTimestamp = Date.now();
     }
   });
 

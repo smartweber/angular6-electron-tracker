@@ -25,9 +25,12 @@ export class DashboardComponent implements OnInit {
     /**
      * get project list
      */
-    this._dataService.getAllProjectSettings().then((projects) => {
-      console.log('project list: ', projects);
-      this.projects = projects;
+    this._dataService.getAllProjectsTaks().then((res) => {
+      console.log('project task list: ', res);
+      this.projects = res[0];
+      this.isLoad = true;
+    }).catch(() => {
+      this.projects = [];
       this.isLoad = true;
     });
   }

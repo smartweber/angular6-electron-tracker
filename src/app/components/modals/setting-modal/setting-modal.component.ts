@@ -45,15 +45,15 @@ export class SettingModalComponent implements OnInit {
     ];
     this.trackInterval = 10;
     this.tracks = [];
-    data['getDataPromise'].then((res) => {console.log('res: ', res)
-      this.isShowTimer = res['show_timer'] ? res['show_timer'] : false;
-      this.isNotifyScreenshot = res['notify_me_screenshot'] ? res['notify_me_screenshot'] : false;
-      this.isNotifyTrack = res['notify_me_track_on'] ? res['notify_me_track_on'] : false;
-      this.trackInterval = res['untracked_for_in_min'] ? res['untracked_for_in_min'] : 0;
-      this.startTime = res['start_time'] ? moment((res['start_time']), 'HH:mm:ss').format('hh:mm a') : null;
-      this.endTime = res['end_time'] ? moment((res['end_time']), 'HH:mm:ss').format('hh:mm a') : null;
+    data['getDataPromise'].then((res) => {
+      this.isShowTimer = res && res['show_timer'] ? res['show_timer'] : false;
+      this.isNotifyScreenshot = res && res['notify_me_screenshot'] ? res['notify_me_screenshot'] : false;
+      this.isNotifyTrack = res && res['notify_me_track_on'] ? res['notify_me_track_on'] : false;
+      this.trackInterval = res && res['untracked_for_in_min'] ? res['untracked_for_in_min'] : 0;
+      this.startTime = res && res['start_time'] ? moment((res['start_time']), 'HH:mm:ss').format('hh:mm a') : null;
+      this.endTime = res && res['end_time'] ? moment((res['end_time']), 'HH:mm:ss').format('hh:mm a') : null;
       this.tracks = [];
-      if (res['track_on']) {
+      if (res && res['track_on']) {
         const trackOn = res['track_on'].trim();
         this.tracks = trackOn.split(',');
         if (this.tracks.length > 0) {

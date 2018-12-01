@@ -22,7 +22,6 @@ import { LoginComponent } from './components/login/login.component';
 import { AngularFontAwesomeModule } from 'angular-font-awesome';
 import { AlertComponent } from './components/_directives/alert/alert.component';
 import { AlertService } from './components/_services/alert.service';
-import { HeaderComponent } from './components/header/header.component';
 import { routing } from './app.routing';
 import { AuthGuard } from './components/_guards/auth.guard';
 import { TimeConvertPipe } from './components/_pipes/time-convert.pipe';
@@ -62,7 +61,6 @@ export function HttpLoaderFactory(http: HttpClient) {
     WebviewDirective,
     LoginComponent,
     AlertComponent,
-    HeaderComponent,
     TimeConvertPipe,
     DashboardComponent,
     ObjectKeyPipe,
