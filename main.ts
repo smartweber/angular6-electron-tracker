@@ -274,9 +274,9 @@ function calcuateIdleTime() {
     if (diffInMilliSecs >= idleSettingTimeInMins * 60 * 1000) { // idle setting time in a minute format
       idleTimeInMilliSecs += diffInMilliSecs;
     }
-  }
 
-  lastTrackTimestamp = Date.now();
+    lastTrackTimestamp = Date.now();
+  }
 }
 
 /**
@@ -306,16 +306,17 @@ function createTimeIntervals() {
 
   trackingIntervalHandler = setInterval(() => {
     console.log('tracking interval running:');
-    // increase timer
-    if (projectsDetail.hasOwnProperty(selectedProjectId)) {
-      const current = Date.now();
-      const diffInMilliSecs = current - lastProjectTimestamp;
-      projectsDetail[selectedProjectId]['time'] += diffInMilliSecs;
-      lastProjectTimestamp = current;
-      updateTrayTitle();
-    }
 
     if (isTrack) {
+      // increase timer
+      if (projectsDetail.hasOwnProperty(selectedProjectId)) {
+        const current = Date.now();
+        const diffInMilliSecs = current - lastProjectTimestamp;
+        projectsDetail[selectedProjectId]['time'] += diffInMilliSecs;
+        lastProjectTimestamp = current;
+        updateTrayTitle();
+      }
+
       updateTracks(currentProjectId, currentTaskId, Date.now());
     }
   }, trackingIntervalInMiniSecs);
@@ -466,6 +467,7 @@ function createTrayMenu() {
       label: 'Sign out',
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'signout'});
+        menuTemplate[2].enabled = false;
       }
     },
     {
@@ -512,6 +514,24 @@ function buildProjectMenu(projects, tasks) {
     });
   }
   return projectSubMenu;
+}
+
+/**
+ * round number
+ * @param value: value
+ * @param ndec: dec
+ */
+function round(value, ndec) {
+  let n = 10;
+  for (let i = 1; i < ndec; i++) {
+    n *= 10;
+  }
+
+  if (!ndec || ndec <= 0) {
+    return Math.round(value);
+  } else {
+    return Math.round(value * n) / n;
+  }
 }
 
 /**
@@ -602,7 +622,7 @@ try {
 
     if (contextMenu && menuTemplate.length > 0) {
       console.log('engagement cronjob running:');
-      const engagementPer = calculateEngagementPer();
+      const engagementPer = round(calculateEngagementPer(), 2);
       menuTemplate[0].label = updateEngagement(engagementPer);
       contextMenu = Menu.buildFromTemplate(menuTemplate);
       tray.setContextMenu(contextMenu);
@@ -742,15 +762,23 @@ try {
    * ipcMain lisner to get stop time tracking event
    */
   ipcMain.on('stop-track', (event, arg) => {
-    isTrack = false;
-    updateTracks(arg['projectId'], arg['taskId'], Date.now(), false);
-    clearTrackData();
-    if (tray && menuTemplate.length > 0) {
-      menuTemplate[1].visible = false;
-      menuTemplate[2].visible = true;
-      menuTemplate[2].enabled = true;
-      contextMenu = Menu.buildFromTemplate(menuTemplate);
-      tray.setContextMenu(contextMenu);
+    if (isTrack) {
+      updateTracks(arg['projectId'], arg['taskId'], Date.now(), false);
+      clearTrackData();
+
+      if (tray && menuTemplate.length > 0) {
+        menuTemplate[1].visible = false;
+        menuTemplate[2].visible = true;
+        contextMenu = Menu.buildFromTemplate(menuTemplate);
+        tray.setContextMenu(contextMenu);
+      }
+
+      event.sender.send('stop-track-reply', {
+        currentTaskId: currentTaskId,
+        currentProjectId: currentProjectId,
+        selectedTaskId: selectedTaskId,
+        selectedProjectId: selectedProjectId
+      });
     }
   });
 
@@ -788,6 +816,7 @@ try {
       updateTrayTitle();
     } else { // if any project is not selected
       if (
+        isTrack &&
         Object.keys(selectedProject).length !== 0 &&
         selectedProject['id'] &&
         projectsDetail.hasOwnProperty(selectedProject['id'])

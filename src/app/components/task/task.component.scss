@@ -1,8 +1,10 @@
 :host {
-    height: 100%;
+    height: calc( 100% - 64px );
+
     .list-group-item {
         cursor: pointer;
     }
+
     h3 {
         margin: 0;
     }

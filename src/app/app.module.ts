@@ -47,6 +47,7 @@ import { HelpComponent } from './components/help/help.component';
 import { CheckComponent } from './components/check/check.component';
 import { NoteComponent } from './components/modals/note/note.component';
 import { SettingModalComponent } from './components/modals/setting-modal/setting-modal.component';
+import { HeaderComponent } from './components/header/header.component';
 
 
 // AoT requires an exported function for factories
@@ -68,7 +69,8 @@ export function HttpLoaderFactory(http: HttpClient) {
     HelpComponent,
     CheckComponent,
     NoteComponent,
-    SettingModalComponent
+    SettingModalComponent,
+    HeaderComponent
   ],
   imports: [
     BrowserModule,

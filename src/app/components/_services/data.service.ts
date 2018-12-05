@@ -156,24 +156,22 @@ export class DataService {
        */
       this._electronService.ipcRenderer.on('stop-track-reply', (event, arg) => {
         console.log('stop-track-reply:', arg);
-        this.currentProjectId = -1;
-        this.currentTaskId = -1;
-        this.selectedProjectId = -1;
-        this.selectedTaskId = -1;
-        this.isTracking = false;
 
         if (this.tasks.length > 0) {
           for (let index = 0; index < this.tasks.length; index ++) {
-            if (this.tasks[index]['id'] === arg['task_id']) {
+            if (this.tasks[index]['id'] === this.currentTaskId) {
               this.tasks[index]['timerStatus'] = 'InActive';
             }
           }
-          this.setTasksSubscribe();
-
-          this.takecreenshot().then(() => {
-            this.postActivity(arg);
-          });
         }
+
+        this.currentProjectId = arg['currentProjectId'];
+        this.currentTaskId = arg['currentTaskId'];
+        this.selectedProjectId = arg['selectedProjectId'];
+        this.selectedTaskId = arg['selectedTaskId'];
+        this.isTracking = false;
+
+        this.setTasksSubscribe();
       });
 
       /**
@@ -233,10 +231,10 @@ export class DataService {
           this._router.navigate(['/check']);
             break;
           case 'signout':
-            localStorage.removeItem('userInformation');
             if (this.isTracking) {
               this.stopTrack();
             }
+            localStorage.removeItem('userInformation');
             this._router.navigate(['/login']);
             break;
 
