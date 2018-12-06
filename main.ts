@@ -86,7 +86,9 @@ function createWindow() {
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
     // win.close();
-    win = null;
+    if (win) {
+      win = null;
+    }
   });
 
 }
@@ -361,12 +363,17 @@ function updateTrayTitle() {
   if (projectsDetail && selectedProjectId && projectsDetail[selectedProjectId]) {
     const timeInMiniSecs = parseInt(projectsDetail[selectedProjectId]['time'], 10);
     const projectTimer = makeTrayTime(Math.floor(timeInMiniSecs / 1000));
-    if (tray) {
-      tray.setTitle(`${selectedProject['code']} ${projectTimer}`);
+    if (contextMenu && menuTemplate.length > 0) {
+      menuTemplate[1].visible = true;
+      menuTemplate[1].label = `${selectedProject['code']} ${projectTimer}`;
+      contextMenu = Menu.buildFromTemplate(menuTemplate);
+      tray.setContextMenu(contextMenu);
     }
   } else {
-    if (tray) {
-      tray.setTitle('');
+    if (contextMenu && menuTemplate.length > 0) {
+      menuTemplate[1].visible = false;
+      contextMenu = Menu.buildFromTemplate(menuTemplate);
+      tray.setContextMenu(contextMenu);
     }
   }
 }
@@ -394,6 +401,10 @@ function createTrayMenu() {
   menuTemplate = [
     {
       label: updateEngagement(0)
+    },
+    {
+      label: '',
+      visible: false
     },
     {
       label: 'Timer is running',
@@ -467,7 +478,7 @@ function createTrayMenu() {
       label: 'Sign out',
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'signout'});
-        menuTemplate[2].enabled = false;
+        menuTemplate[3].enabled = false;
       }
     },
     {
@@ -485,7 +496,6 @@ function createTrayMenu() {
   contextMenu = Menu.buildFromTemplate(menuTemplate);
   tray.setContextMenu(contextMenu);
   tray.setToolTip('Time Tracker');
-  tray.setTitle('');
 }
 
 /**
@@ -698,9 +708,9 @@ try {
       });
 
       if (tray && menuTemplate.length > 0) {
-        menuTemplate[1].visible = false;
-        menuTemplate[2].visible = true;
-        menuTemplate[2].enabled = true;
+        menuTemplate[2].visible = false;
+        menuTemplate[3].visible = true;
+        menuTemplate[3].enabled = true;
         contextMenu = Menu.buildFromTemplate(menuTemplate);
         tray.setContextMenu(contextMenu);
       }
@@ -711,7 +721,10 @@ try {
    * ipcMain lisner to quit the app
    */
   ipcMain.on('quit-app', (event, arg) => {
-    win = null;
+    if (win) {
+      win = null;
+    }
+
     app.quit();
   });
 
@@ -723,9 +736,9 @@ try {
       if (currentTaskId !== arg['taskId'] || currentProjectId !== arg['projectId']) {
         isTrack = false;
         if (tray && menuTemplate.length > 0) {
-          menuTemplate[1].visible = false;
-          menuTemplate[2].visible = true;
-          menuTemplate[2].enabled = true;
+          menuTemplate[2].visible = false;
+          menuTemplate[3].visible = true;
+          menuTemplate[3].enabled = true;
           contextMenu = Menu.buildFromTemplate(menuTemplate);
           tray.setContextMenu(contextMenu);
         }
@@ -738,8 +751,8 @@ try {
     lastTrackTimestamp = Date.now();
 
     if (tray && menuTemplate.length) {
-      menuTemplate[1].visible = true;
-      menuTemplate[2].visible = false;
+      menuTemplate[2].visible = true;
+      menuTemplate[3].visible = false;
       contextMenu = Menu.buildFromTemplate(menuTemplate);
       tray.setContextMenu(contextMenu);
     }
@@ -767,8 +780,8 @@ try {
       clearTrackData();
 
       if (tray && menuTemplate.length > 0) {
-        menuTemplate[1].visible = false;
-        menuTemplate[2].visible = true;
+        menuTemplate[2].visible = false;
+        menuTemplate[3].visible = true;
         contextMenu = Menu.buildFromTemplate(menuTemplate);
         tray.setContextMenu(contextMenu);
       }
@@ -807,9 +820,9 @@ try {
       createTimeIntervals();
       lastProjectTimestamp = current;
       if (tray && menuTemplate.length > 0) {
-        menuTemplate[1].visible = false;
-        menuTemplate[2].visible = true;
-        menuTemplate[2].enabled = true;
+        menuTemplate[2].visible = false;
+        menuTemplate[3].visible = true;
+        menuTemplate[3].enabled = true;
         contextMenu = Menu.buildFromTemplate(menuTemplate);
         tray.setContextMenu(contextMenu);
       }
@@ -830,12 +843,12 @@ try {
       if (tray) {
         if (tray && menuTemplate.length > 0 && !isTrack) {
           menuTemplate[1].visible = false;
-          menuTemplate[2].visible = true;
-          menuTemplate[2].enabled = false;
+          menuTemplate[2].visible = false;
+          menuTemplate[3].visible = true;
+          menuTemplate[3].enabled = false;
           contextMenu = Menu.buildFromTemplate(menuTemplate);
           tray.setContextMenu(contextMenu);
         }
-        tray.setTitle('');
       }
     }
   });
@@ -857,7 +870,7 @@ try {
 
       const projectSubMenu = buildProjectMenu(arg['projects'], arg['tasks']);
       if (tray && menuTemplate.length > 3) {
-        menuTemplate[3].submenu = projectSubMenu;
+        menuTemplate[4].submenu = projectSubMenu;
         contextMenu = Menu.buildFromTemplate(menuTemplate);
         tray.setContextMenu(contextMenu);
       }
@@ -869,7 +882,7 @@ try {
    */
   ipcMain.on('activity-notification', (event, arg) => {
     if (tray && menuTemplate.length > 0) {
-      menuTemplate[4].enabled = true;
+      menuTemplate[5].enabled = true;
       contextMenu = Menu.buildFromTemplate(menuTemplate);
       tray.setContextMenu(contextMenu);
     }
