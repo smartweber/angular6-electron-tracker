@@ -459,6 +459,7 @@ export class DataService {
       url: url,
       timestamp: Date.now()
     });
+    console.log('screenshot list: ', this.screenshotUrls);
     if (this.screenshotUrls.length > 3) {
       this.screenshotUrls.splice(0, 3);
     }

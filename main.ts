@@ -47,13 +47,13 @@ function createWindow() {
   win = new BrowserWindow({
     // x: 0,
     // y: 0,
-    // width: 1280,
-    // height: 720,
-    width: 472,
-    height: 667,
+    width: 1280,
+    height: 720,
+    // width: 472,
+    // height: 667,
     center: true,
-    minWidth: 472,
-    minHeight: 667,
+    // minWidth: 472,
+    // minHeight: 667,
     maxWidth: 472,
     maxHeight: 667,
     maximizable: false,
@@ -78,7 +78,7 @@ function createWindow() {
   createTrayMenu();
   initData();
 
-  // win.webContents.openDevTools();
+  win.webContents.openDevTools();
 
   // Emitted when the window is closed.
   win.on('closed', () => {
@@ -120,13 +120,8 @@ function customNotify(title, message) {
  * @param projectId: project id
  * @param taskId: task id
  * @param timestamp: timestamp
- * @param isScreenshot: taking screenshot flag
  */
-function updateTracks(projectId, taskId, timestamp, isScreenshot = true) {
-  if (isScreenshot) {
-    takeScreenShots(taskId, trackingTimeIntervalMins * 60 * 1000, false);
-  }
-
+function updateTracks(projectId, taskId, timestamp) {
   const newActivity = createNewActivity(projectId, taskId, timestamp);
   createNewActivityEvent.sender.send('create-new-activity-reply', newActivity);
   console.log('---create activity---');
@@ -170,28 +165,6 @@ function createNewActivity(projectId, taskId, timestamp) {
   keyboardCount = 0;
   previousTimestamp = timestamp;
   return newActivity;
-}
-
-/**
- * take screenshots of desktop from UI
- * @param during: interval between activities in mini-second
- * @param isImmediate: immediate proecss flag
- */
-function takeScreenShots(taskId, during, isImmediate = false) {
-  if (isImmediate) {
-    takeScreenshotEvent.sender.send('take-screenshot-reply', taskId);
-    return;
-  }
-
-  // take a screenshot in random
-  console.log('--- start random screenshot ---');
-  for (let index = 0; index < 3; index ++) {
-    const time = Math.random() * during;
-    console.log('random time: ', time);
-    timerHandlers[index] = setTimeout(() => {
-      takeScreenshotEvent.sender.send('take-screenshot-reply', taskId);
-    }, time);
-  }
 }
 
 /**
@@ -290,6 +263,38 @@ function calculateEngagementPer() {
 }
 
 /**
+ * process time tracking
+ * @param trackingIntervalInMiniSecs tracking interval time
+ */
+function processTimeTrack(trackingIntervalInMiniSecs) {
+  for (let index = 0; index < 3; index ++) {
+    const randomInterval = Math.floor(Math.random() * trackingIntervalInMiniSecs);
+    console.log('random time: ', randomInterval);
+    // random interval start
+    timerHandlers[index] = setTimeout(() => {
+      if (isTrack) {
+        takeScreenshotEvent.sender.send('take-screenshot-reply');
+      }
+    }, randomInterval);
+    // random interval end
+  }
+
+  if (isTrack) {
+    // increase timer
+    if (projectsDetail.hasOwnProperty(selectedProjectId)) {
+      const current = Date.now();
+      const diffInMilliSecs = current - lastProjectTimestamp;
+      projectsDetail[selectedProjectId]['time'] += diffInMilliSecs;
+      lastProjectTimestamp = current;
+      console.log('increase project timer: ', diffInMilliSecs, selectedProjectId, projectsDetail[selectedProjectId]['time'])
+      updateTrayTitle();
+    }
+
+    updateTracks(currentProjectId, currentTaskId, Date.now());
+  }
+}
+
+/**
  * create time intervals
  */
 function createTimeIntervals() {
@@ -305,23 +310,14 @@ function createTimeIntervals() {
 
   const trackingIntervalInMiniSecs = parseInt(trackingTimeIntervalMins, 10) * 60 * 1000;
   console.log('trackingTimeIntervalMins: ', trackingTimeIntervalMins, trackingIntervalInMiniSecs);
+  processTimeTrack(trackingIntervalInMiniSecs);
 
+  // tracking interval start
   trackingIntervalHandler = setInterval(() => {
     console.log('tracking interval running:');
-
-    if (isTrack) {
-      // increase timer
-      if (projectsDetail.hasOwnProperty(selectedProjectId)) {
-        const current = Date.now();
-        const diffInMilliSecs = current - lastProjectTimestamp;
-        projectsDetail[selectedProjectId]['time'] += diffInMilliSecs;
-        lastProjectTimestamp = current;
-        updateTrayTitle();
-      }
-
-      updateTracks(currentProjectId, currentTaskId, Date.now());
-    }
+    processTimeTrack(trackingIntervalInMiniSecs);
   }, trackingIntervalInMiniSecs);
+  // tracking interval end
 
   // engagement cron job
   if (engagementTimeIntervalMins <= 0) {
@@ -441,6 +437,7 @@ function createTrayMenu() {
       label: 'Add a note',
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'note'});
+        win.focus();
       },
       enabled: false
     },
@@ -454,24 +451,28 @@ function createTrayMenu() {
       label: 'Settings',
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'setting'});
+        win.focus();
       }
     },
     {
       label: 'About Track.ly',
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'about'});
+        win.focus();
       }
     },
     {
       label: 'Help',
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'help'});
+        win.focus();
       }
     },
     {
       label: 'Check for updates',
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'check'});
+        win.focus();
       }
     },
     {
@@ -479,6 +480,7 @@ function createTrayMenu() {
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'signout'});
         menuTemplate[3].enabled = false;
+        win.focus();
       }
     },
     {
@@ -742,7 +744,7 @@ try {
           contextMenu = Menu.buildFromTemplate(menuTemplate);
           tray.setContextMenu(contextMenu);
         }
-        updateTracks(currentProjectId, currentTaskId, Date.now(), false);
+        updateTracks(currentProjectId, currentTaskId, Date.now());
         clearTrackData();
       }
     }
@@ -762,7 +764,7 @@ try {
     currentProjectId = arg['projectId'];
     selectedProjectId = arg['projectId'];
     previousTimestamp = Date.now();
-    takeScreenShots(currentTaskId, trackingTimeIntervalMins * 60 * 1000, true);
+    // takeScreenShots(currentTaskId, trackingTimeIntervalMins * 60 * 1000, true);
     event.sender.send('start-track-reply', {
       currentTaskId: currentTaskId,
       currentProjectId: currentProjectId,
@@ -776,7 +778,7 @@ try {
    */
   ipcMain.on('stop-track', (event, arg) => {
     if (isTrack) {
-      updateTracks(arg['projectId'], arg['taskId'], Date.now(), false);
+      updateTracks(arg['projectId'], arg['taskId'], Date.now());
       clearTrackData();
 
       if (tray && menuTemplate.length > 0) {
