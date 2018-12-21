@@ -5,7 +5,7 @@ import * as url from 'url';
 import * as moment from 'moment';
 import { CronJob } from 'cron';
 import { notify } from 'node-notifier';
-let win, serve, size, isTrack, keyboardCount, mouseCount, timerHandlers, settingData;
+let win, serve, size, isTrack, keyboardCount, mouseCount, screenshotTimerHandlers, settingData;
 let takeScreenshotEvent, createNewActivityEvent, trayControlEvent, tray, selectProjectEvent, controlEvent;
 let hourCronjobHandler, trackingIntervalHandler, engagementIntervalHandler, checkTrackOnHandler;
 let contextMenu, currentTaskId, currentProjectId, selectedTaskId, selectedProjectId, previousTimestamp;
@@ -32,7 +32,7 @@ settingData = {};
 projectsDetail = {};
 selectedProject = {};
 menuTemplate = [];
-timerHandlers = [];
+screenshotTimerHandlers = [];
 
 const args = process.argv.slice(1);
 serve = args.some(val => val === '--serve');
@@ -47,13 +47,14 @@ function createWindow() {
   win = new BrowserWindow({
     // x: 0,
     // y: 0,
-    width: 1280,
-    height: 720,
-    // width: 472,
-    // height: 667,
+    // width: 1280,
+    // height: 720,
+    width: 472,
+    height: 667,
     center: true,
-    // minWidth: 472,
-    // minHeight: 667,
+    icon: path.join(__dirname, 'app.png'),
+    minWidth: 472,
+    minHeight: 667,
     maxWidth: 472,
     maxHeight: 667,
     maximizable: false,
@@ -78,7 +79,7 @@ function createWindow() {
   createTrayMenu();
   initData();
 
-  win.webContents.openDevTools();
+  // win.webContents.openDevTools();
 
   // Emitted when the window is closed.
   win.on('closed', () => {
@@ -172,8 +173,8 @@ function createNewActivity(projectId, taskId, timestamp) {
  */
 function clearScreenshotsIntervals() {
   for (let index = 0; index < 3; index ++) {
-    if (timerHandlers[index]) {
-      clearInterval(timerHandlers[index]);
+    if (screenshotTimerHandlers[index]) {
+      clearInterval(screenshotTimerHandlers[index]);
     }
   }
 }
@@ -271,7 +272,7 @@ function processTimeTrack(trackingIntervalInMiniSecs) {
     const randomInterval = Math.floor(Math.random() * trackingIntervalInMiniSecs);
     console.log('random time: ', randomInterval);
     // random interval start
-    timerHandlers[index] = setTimeout(() => {
+    screenshotTimerHandlers[index] = setTimeout(() => {
       if (isTrack) {
         takeScreenshotEvent.sender.send('take-screenshot-reply');
       }
@@ -286,8 +287,7 @@ function processTimeTrack(trackingIntervalInMiniSecs) {
       const diffInMilliSecs = current - lastProjectTimestamp;
       projectsDetail[selectedProjectId]['time'] += diffInMilliSecs;
       lastProjectTimestamp = current;
-      console.log('increase project timer: ', diffInMilliSecs, selectedProjectId, projectsDetail[selectedProjectId]['time'])
-      updateTrayTitle();
+      buildProjectInfo();
     }
 
     updateTracks(currentProjectId, currentTaskId, Date.now());
@@ -295,17 +295,28 @@ function processTimeTrack(trackingIntervalInMiniSecs) {
 }
 
 /**
- * create time intervals
+ * clear all kinds of time interval handlers
  */
-function createTimeIntervals() {
+function clearTimeIntervals() {
+  if (trackingIntervalHandler) {
+    clearInterval(trackingIntervalHandler);
+  }
+
+  if (engagementIntervalHandler) {
+    clearInterval(engagementIntervalHandler);
+  }
+
+  clearScreenshotsIntervals();
+}
+
+/**
+ * start time intervals
+ */
+function startTimeIntervals() {
   // tracking cron job
   if (trackingTimeIntervalMins <= 0) {
     console.log('Tracking interval is less than 0');
     return;
-  }
-
-  if (trackingIntervalHandler) {
-    clearInterval(trackingIntervalHandler);
   }
 
   const trackingIntervalInMiniSecs = parseInt(trackingTimeIntervalMins, 10) * 60 * 1000;
@@ -323,10 +334,6 @@ function createTimeIntervals() {
   if (engagementTimeIntervalMins <= 0) {
     console.log('Tracking interval is less than 0');
     return;
-  }
-
-  if (engagementIntervalHandler) {
-    clearInterval(engagementIntervalHandler);
   }
 
   const egIntervalInMiniSecs = parseInt(engagementTimeIntervalMins, 10) * 60 * 1000;
@@ -353,9 +360,9 @@ function makeTrayTime(secs) {
 }
 
 /**
- * update tray title
+ * build project information like code and timer
  */
-function updateTrayTitle() {
+function buildProjectInfo() {
   if (projectsDetail && selectedProjectId && projectsDetail[selectedProjectId]) {
     const timeInMiniSecs = parseInt(projectsDetail[selectedProjectId]['time'], 10);
     const projectTimer = makeTrayTime(Math.floor(timeInMiniSecs / 1000));
@@ -403,6 +410,9 @@ function createTrayMenu() {
       visible: false
     },
     {
+      type: 'separator'
+    },
+    {
       label: 'Timer is running',
       click: () => {
         if (currentProjectId >= 0 && trayControlEvent) {
@@ -431,7 +441,13 @@ function createTrayMenu() {
       enabled: false
     },
     {
+      type: 'separator'
+    },
+    {
       label: 'Switch Projects'
+    },
+    {
+      type: 'separator'
     },
     {
       label: 'Add a note',
@@ -442,10 +458,16 @@ function createTrayMenu() {
       enabled: false
     },
     {
+      type: 'separator'
+    },
+    {
       label: 'Open Dashboard',
       click: () => {
         shell.openExternal('https://tracklyapp.appup.cloud/trackly/#/430/1587/dashboard');
       }
+    },
+    {
+      type: 'separator'
     },
     {
       label: 'Settings',
@@ -455,11 +477,16 @@ function createTrayMenu() {
       }
     },
     {
+      type: 'separator'
+    },
+    {
       label: 'About Track.ly',
       click: () => {
-        controlEvent.sender.send('control-event-reply', {type: 'about'});
-        win.focus();
+        shell.openExternal('https://www.track.ly/');
       }
+    },
+    {
+      type: 'separator'
     },
     {
       label: 'Help',
@@ -469,6 +496,9 @@ function createTrayMenu() {
       }
     },
     {
+      type: 'separator'
+    },
+    {
       label: 'Check for updates',
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'check'});
@@ -476,12 +506,18 @@ function createTrayMenu() {
       }
     },
     {
+      type: 'separator'
+    },
+    {
       label: 'Sign out',
       click: () => {
         controlEvent.sender.send('control-event-reply', {type: 'signout'});
-        menuTemplate[3].enabled = false;
+        menuTemplate[4].enabled = false;
         win.focus();
       }
+    },
+    {
+      type: 'separator'
     },
     {
       label: 'Quit tracker',
@@ -501,6 +537,59 @@ function createTrayMenu() {
 }
 
 /**
+ * select project
+ */
+function selectProject() {
+  if (selectedProjectId < 0) {
+    console.log('selected project id is wrong');
+    return;
+  }
+
+  console.log('selectedProject: ', selectedProjectId)
+  selectedProject = projectsDetail[selectedProjectId]['data'];
+  console.log('current selected project: ', selectedProject)
+  idleSettingTimeInMins = selectedProject['ideal_time_interval_mins'] ? parseInt(selectedProject['ideal_time_interval_mins'], 10) : 0;
+  trackingTimeIntervalMins = selectedProject['time_interval_mins'] ? parseInt(selectedProject['time_interval_mins'], 10) : 0;
+  engagementTimeIntervalMins = selectedProject['engagement_interval_mins'] ?
+    parseInt(selectedProject['engagement_interval_mins'], 10) : 0;
+  clearTimeIntervals();
+  startTimeIntervals();
+  lastProjectTimestamp = Date.now();
+
+  if (!isTrack) { // if timer is stopped
+    if (tray && menuTemplate.length > 0) {
+      // hide stop tray menu
+      menuTemplate[3].visible = false;
+      // Show start tray menu
+      menuTemplate[4].visible = true;
+      menuTemplate[4].enabled = true;
+      contextMenu = Menu.buildFromTemplate(menuTemplate);
+      tray.setContextMenu(contextMenu);
+    }
+  }
+
+  buildProjectInfo();
+}
+
+/**
+ * select project or task
+ * @param idInfo projectId-taskId
+ */
+function selectProjectTask(idInfo) {
+  const arr = idInfo.split('-');
+  if (arr.length === 1) { // project case
+    selectedProjectId = parseInt(arr[0], 10);
+    selectProject();
+    console.log('selectedProject: ', selectedProjectId)
+  } else if (arr.length === 2) { // task case
+    selectedProjectId = parseInt(arr[0], 10);
+    selectedTaskId = parseInt(arr[1], 10);
+    selectProject();
+    console.log('selectedTask: ', selectedProjectId, selectedTaskId)
+  }
+}
+
+/**
  * build project tray menu
  * @param projects: projects
  * @param tasks: tasks
@@ -514,15 +603,27 @@ function buildProjectMenu(projects, tasks) {
         if (parseInt(tasks[index]['project_id'], 10) === parseInt(project['id'], 10)) {
           projectTasks.push({
             id: project['id'] + '-' + tasks[index]['id'],
-            label: tasks[index]['description']
+            label: tasks[index]['description'],
+            click: (menuItem: Object) => {
+              selectProjectTask(menuItem['id']);
+            }
           });
         }
       }
-      return {
+
+      const returnItem = {
         id: project['id'],
         label: project['name'],
-        submenu: projectTasks
+        click: (menuItem: Object) => {
+          selectProjectTask(menuItem['id']);
+        }
       };
+
+      if (projectTasks.length > 0) {
+        returnItem['submenu'] = projectTasks;
+      }
+
+      return returnItem;
     });
   }
   return projectSubMenu;
@@ -710,9 +811,9 @@ try {
       });
 
       if (tray && menuTemplate.length > 0) {
-        menuTemplate[2].visible = false;
-        menuTemplate[3].visible = true;
-        menuTemplate[3].enabled = true;
+        menuTemplate[3].visible = false;
+        menuTemplate[4].visible = true;
+        menuTemplate[4].enabled = true;
         contextMenu = Menu.buildFromTemplate(menuTemplate);
         tray.setContextMenu(contextMenu);
       }
@@ -738,9 +839,9 @@ try {
       if (currentTaskId !== arg['taskId'] || currentProjectId !== arg['projectId']) {
         isTrack = false;
         if (tray && menuTemplate.length > 0) {
-          menuTemplate[2].visible = false;
-          menuTemplate[3].visible = true;
-          menuTemplate[3].enabled = true;
+          menuTemplate[3].visible = false;
+          menuTemplate[4].visible = true;
+          menuTemplate[4].enabled = true;
           contextMenu = Menu.buildFromTemplate(menuTemplate);
           tray.setContextMenu(contextMenu);
         }
@@ -753,8 +854,8 @@ try {
     lastTrackTimestamp = Date.now();
 
     if (tray && menuTemplate.length) {
-      menuTemplate[2].visible = true;
-      menuTemplate[3].visible = false;
+      menuTemplate[3].visible = true;
+      menuTemplate[4].visible = false;
       contextMenu = Menu.buildFromTemplate(menuTemplate);
       tray.setContextMenu(contextMenu);
     }
@@ -782,8 +883,8 @@ try {
       clearTrackData();
 
       if (tray && menuTemplate.length > 0) {
-        menuTemplate[2].visible = false;
-        menuTemplate[3].visible = true;
+        menuTemplate[3].visible = false;
+        menuTemplate[4].visible = true;
         contextMenu = Menu.buildFromTemplate(menuTemplate);
         tray.setContextMenu(contextMenu);
       }
@@ -819,16 +920,17 @@ try {
       trackingTimeIntervalMins = selectedProject['time_interval_mins'] ? parseInt(selectedProject['time_interval_mins'], 10) : 0;
       engagementTimeIntervalMins = selectedProject['engagement_interval_mins'] ?
         parseInt(selectedProject['engagement_interval_mins'], 10) : 0;
-      createTimeIntervals();
+      clearTimeIntervals();
+      startTimeIntervals();
       lastProjectTimestamp = current;
       if (tray && menuTemplate.length > 0) {
-        menuTemplate[2].visible = false;
-        menuTemplate[3].visible = true;
-        menuTemplate[3].enabled = true;
+        menuTemplate[3].visible = false;
+        menuTemplate[4].visible = true;
+        menuTemplate[4].enabled = true;
         contextMenu = Menu.buildFromTemplate(menuTemplate);
         tray.setContextMenu(contextMenu);
       }
-      updateTrayTitle();
+      buildProjectInfo();
     } else { // if any project is not selected
       if (
         isTrack &&
@@ -845,9 +947,9 @@ try {
       if (tray) {
         if (tray && menuTemplate.length > 0 && !isTrack) {
           menuTemplate[1].visible = false;
-          menuTemplate[2].visible = false;
-          menuTemplate[3].visible = true;
-          menuTemplate[3].enabled = false;
+          menuTemplate[3].visible = false;
+          menuTemplate[4].visible = true;
+          menuTemplate[4].enabled = false;
           contextMenu = Menu.buildFromTemplate(menuTemplate);
           tray.setContextMenu(contextMenu);
         }
@@ -859,6 +961,8 @@ try {
    * ipcMain lisner to get all projects and tasks
    */
   ipcMain.on('get-all-projects-tasks', (event, arg) => {
+    let projectSubMenu = [];
+
     if (arg['projects'] && arg['projects'].length > 0) {
       for (let index = 0; index < arg['projects'].length; index ++) {
         if (arg['projects'][index] && arg['projects'][index]['id']) {
@@ -867,15 +971,21 @@ try {
               time: 0
             };
           }
+
+          projectsDetail[arg['projects'][index]['id']]['data'] = arg['projects'][index];
         }
       }
 
-      const projectSubMenu = buildProjectMenu(arg['projects'], arg['tasks']);
-      if (tray && menuTemplate.length > 3) {
-        menuTemplate[4].submenu = projectSubMenu;
-        contextMenu = Menu.buildFromTemplate(menuTemplate);
-        tray.setContextMenu(contextMenu);
+      projectSubMenu = buildProjectMenu(arg['projects'], arg['tasks']);
+    }
+
+    if (tray && menuTemplate.length > 3) {
+      if (projectSubMenu.length > 0) {
+        menuTemplate[6].submenu = projectSubMenu;
       }
+
+      contextMenu = Menu.buildFromTemplate(menuTemplate);
+      tray.setContextMenu(contextMenu);
     }
   });
 
@@ -884,7 +994,7 @@ try {
    */
   ipcMain.on('activity-notification', (event, arg) => {
     if (tray && menuTemplate.length > 0) {
-      menuTemplate[5].enabled = true;
+      menuTemplate[8].enabled = true;
       contextMenu = Menu.buildFromTemplate(menuTemplate);
       tray.setContextMenu(contextMenu);
     }
