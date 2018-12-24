@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, ipcMain, Tray, Menu, shell } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, Tray, Menu, shell, nativeImage } from 'electron';
 import * as ioHook from 'iohook';
 import * as path from 'path';
 import * as url from 'url';
@@ -52,7 +52,7 @@ function createWindow() {
     width: 472,
     height: 667,
     center: true,
-    icon: path.join(__dirname, 'app.png'),
+    icon: nativeImage.createFromPath(path.join(__dirname, '/icons/256x256.png')),
     minWidth: 472,
     minHeight: 667,
     maxWidth: 472,
@@ -398,7 +398,7 @@ function createTrayMenu() {
   /**
    * Set tray icon
    */
-  const iconPath = path.join(__dirname, 'tray.png');
+  const iconPath = path.join(__dirname, 'icons', '16x16.png');
 
   tray = new Tray(iconPath);
   menuTemplate = [
@@ -423,7 +423,7 @@ function createTrayMenu() {
           });
         }
       },
-      icon: path.join(__dirname, 'pause.png'),
+      icon: path.join(__dirname, 'icons', 'pause.png'),
       visible: false
     },
     {
@@ -437,14 +437,14 @@ function createTrayMenu() {
           });
         }
       },
-      icon: path.join(__dirname, 'play.png'),
+      icon: path.join(__dirname, 'icons', 'play.png'),
       enabled: false
     },
     {
       type: 'separator'
     },
     {
-      label: 'Switch Projects'
+      label: 'Switch Projects',
     },
     {
       type: 'separator'

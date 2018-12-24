@@ -1,7 +1,7 @@
 {
   "name": "Trackly",
-  "version": "5.2.0",
-  "description": "Time tracker app (Angular 7 + Electron)",
+  "version": "5.2.13",
+  "description": "Time tracking electron application",
   "homepage": "https://github.com/maximegris/angular-electron",
   "author": {
     "name": "web star",
